@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voodoo Wallet — Privacy Policy</title>
+  <style>
+    :root {
+      --bg: #0f0f14;
+      --text: #e8e8ed;
+      --muted: #9ca3af;
+      --accent: #037dd6;
+      --border: #2a2a35;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 24px 20px 48px;
+      max-width: 720px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; color: var(--accent); }
+    h2 { font-size: 1.1rem; margin: 28px 0 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    p, li { font-size: 14px; }
+    .meta { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    .summary {
+      background: rgba(3, 125, 214, 0.1);
+      border: 1px solid rgba(3, 125, 214, 0.3);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: rgba(255,255,255,0.04); }
+    a { color: var(--accent); }
+    code { font-size: 12px; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Voodoo Wallet — Privacy Policy</h1>
+  <p class="meta">Last updated: July 14, 2026 · Version 1.0.6</p>
+
+  <div class="summary">
+    <strong>Summary:</strong> Voodoo Wallet is a non-custodial PulseChain wallet. We do not run servers or collect your data.
+    Keys stay encrypted on your device and are never sent to us.
+  </div>
+
+  <h2>1. Data stored on your device</h2>
+  <p>The extension stores data locally in Chrome storage:</p>
+  <ul>
+    <li><code>chrome.storage.local</code> — encrypted wallet vault, settings, custom tokens, NFT collections, DApp connection permissions</li>
+    <li><code>chrome.storage.session</code> — temporary unlocked session (cleared when you lock the wallet or close the browser)</li>
+  </ul>
+  <p>This data does not leave your device except when you send transactions or sign messages on-chain.</p>
+
+  <h2>2. Third-party services</h2>
+  <table>
+    <tr><th>Service</th><th>Data sent</th><th>Purpose</th></tr>
+    <tr><td>PulseChain RPC (<code>rpc.pulsechain.com</code>, <code>pulsechain.publicnode.com</code>)</td><td>Wallet address, transaction data</td><td>Balances, gas, broadcast transactions</td></tr>
+    <tr><td>PulseScan API (<code>api.scan.pulsechain.com</code>)</td><td>Wallet address</td><td>Transaction history</td></tr>
+    <tr><td>Otterscan (<code>otter.pulsechain.com</code>)</td><td>Wallet address (when you open explorer links)</td><td>Block explorer</td></tr>
+    <tr><td>DexScreener (<code>api.dexscreener.com</code>)</td><td>None (public token price API)</td><td>VDO, MAGIC, POISON prices</td></tr>
+    <tr><td>CoinGecko (<code>api.coingecko.com</code>)</td><td>None (public price API)</td><td>PLS price fallback</td></tr>
+    <tr><td>Open Exchange Rates (<code>open.er-api.com</code>)</td><td>None (public forex API)</td><td>Display currency conversion</td></tr>
+  </table>
+  <p>These services have their own privacy policies and may log IP addresses.</p>
+
+  <h2>3. DApp connections</h2>
+  <p>After you approve, connected websites receive your <strong>public wallet address</strong>. You can revoke access under <strong>Settings → Security &amp; Password → Connected sites</strong>. Review every sign and transaction request in the wallet popup.</p>
+
+  <h2>4. What we do not collect</h2>
+  <ul>
+    <li>No server accounts or registration</li>
+    <li>No analytics or tracking</li>
+    <li>No sale of personal data</li>
+    <li>No cloud key backup</li>
+  </ul>
+
+  <h2>5. Chrome permissions</h2>
+  <ul>
+    <li><strong>storage</strong> — local wallet data and DApp permissions</li>
+    <li><strong>tabs</strong> — route DApp provider messages to the correct browser tab</li>
+    <li><strong>host permissions</strong> — blockchain RPC and price APIs listed above</li>
+    <li><strong>content script (all URLs)</strong> — inject <code>window.ethereum</code> so PulseChain dApps can connect; no page content is read or modified beyond the provider</li>
+  </ul>
+
+  <h2>6. Security</h2>
+  <p>PBKDF2 (310,000 iterations) + AES-GCM encryption, 10-minute auto-lock, disabled <code>eth_sign</code>, and transaction review before approval.</p>
+
+  <h2>7. Children</h2>
+  <p>Not intended for users under 18.</p>
+
+  <h2>8. Changes</h2>
+  <p>We may update this policy. The date above reflects the latest version.</p>
+
+  <h2>9. Contact</h2>
+  <p>Privacy questions: <a href="mailto:info@voodootoken.com">info@voodootoken.com</a></p>
+</body>
+</html>

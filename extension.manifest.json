@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "Voodoo Wallet",
+  "short_name": "Voodoo Wallet",
+  "version": "1.0.6",
+  "description": "Voodoo Wallet — PulseChain wallet with VDO staking",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "https://rpc.pulsechain.com/*",
+    "https://scan.pulsechain.com/*",
+    "https://api.scan.pulsechain.com/*",
+    "https://otter.pulsechain.com/*",
+    "https://api.coingecko.com/*",
+    "https://api.dexscreener.com/*",
+    "https://open.er-api.com/*"
+  ],
+  "options_ui": {
+    "page": "src/fullscreen/index.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Voodoo Wallet",
+    "default_icon": {
+      "16": "public/icon16.png",
+      "48": "public/icon48.png",
+      "128": "public/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "public/icon16.png",
+    "48": "public/icon48.png",
+    "128": "public/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "public/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+INSTALL VOODOO WALLET IN CHROME
+===============================
+
+This repo includes a pre-built "dist" folder. You do NOT need npm or Node.js
+to install the extension.
+
+
+OPTION A — Download from GitHub (easiest)
+-----------------------------------------
+1. GitHub → green "Code" → Download ZIP
+2. Unzip the file
+3. Open the project folder (the one that contains "dist" and "manifest.json")
+   - If you see two nested folders with the same name, open the INNER one
+4. Chrome → chrome://extensions
+5. Turn ON "Developer mode"
+6. Click "Load unpacked"
+7. Select the "dist" folder inside the project
+
+   Example path after unzip:
+   ...\Voodoo-Wallet-Extension-main\dist
+
+
+OPTION B — Load project root (also works)
+-----------------------------------------
+After step 3 above, you can select the project folder itself (the parent of
+"dist") instead of the dist subfolder. It must contain manifest.json at the top.
+
+
+OPTION C — Developers (change source code)
+------------------------------------------
+Only if you edit src/ files:
+  npm install
+  npm run build
+Then reload the extension in chrome://extensions
+
+
+TROUBLESHOOTING
+---------------
+"Manifest missing" → You selected the wrong folder. Pick the folder that
+                     contains manifest.json, or the "dist" subfolder.
+
+"MIME type main.jsx" → You loaded source without a build. Use the "dist"
+                       folder from this repo, or run npm run build.

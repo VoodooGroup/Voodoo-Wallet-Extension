@@ -1,0 +1,1 @@
+import{a as t,w as a,b as r,c as l,j as e,R as s,A as o,D as p}from"./index-CrcVbkey.js";t(p);document.documentElement.style.setProperty("--wallpaper-image",`url("${a()}")`);r();l.createRoot(document.getElementById("root")).render(e.jsx(s.StrictMode,{children:e.jsx(o,{})}));
