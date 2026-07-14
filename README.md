@@ -1,5 +1,4 @@
 # Voodoo Wallet — Chrome Extension
-# Voodoo Wallet
  
 A **PulseChain-only Chrome extension** wallet with **VDO staking**, send/receive, NFTs, and MetaMask-compatible dApp support.
  
