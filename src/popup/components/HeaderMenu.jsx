@@ -10,6 +10,7 @@ import {
   menuYieldsIconUrl,
 } from '../../lib/assets';
 import { openFullscreenWallet } from '../../lib/fullscreen';
+import { sendRuntimeMessage } from '../../lib/runtime-message.js';
 
 function MenuItem({
   iconSrc, onClick, children,
@@ -58,6 +59,14 @@ export default function HeaderMenu({ onImportWallet, onOpenInsights }) {
   const handleLock = (event) => {
     event.stopPropagation();
     setOpen(false);
+    // Cancel any open dApp approve/connect so it does not return after unlock
+    sendRuntimeMessage({ type: 'DAPP_REJECT_SIGN', closeWindow: false });
+    sendRuntimeMessage({ type: 'DAPP_REJECT_CONNECT', closeWindow: false });
+    try {
+      window.dispatchEvent(new CustomEvent('voodoo:nav-away'));
+    } catch {
+      /* ignore */
+    }
     lock();
   };
 

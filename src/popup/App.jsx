@@ -3,6 +3,7 @@ import {
 } from 'react';
 import { I18nProvider, useI18n } from '../context/I18nContext.jsx';
 import { WalletProvider, useWallet } from '../context/WalletContext';
+import { ProfilePictureProvider, useProfilePicture } from '../context/ProfilePictureContext.jsx';
 import ErrorBoundary from './ErrorBoundary';
 import Onboarding from './pages/Onboarding';
 import Unlock from './pages/Unlock';
@@ -14,6 +15,7 @@ import { getAutoLockMs } from '../lib/auto-lock';
 import { getSession, touchSession } from '../lib/session';
 import { getAppVersion } from '../lib/version';
 import { TabNavProvider } from '../context/TabNavContext.jsx';
+import { sendRuntimeMessage } from '../lib/runtime-message.js';
 
 const Home = lazy(() => import('./pages/Home'));
 const Swap = lazy(() => import('./pages/Swap'));
@@ -66,6 +68,7 @@ function Shell() {
   const {
     loading, unlocked, hasWallet, theme, lock,
   } = useWallet();
+  const { profilePicture } = useProfilePicture();
   const [tab, setTab] = useState('home');
   const [importOpen, setImportOpen] = useState(false);
   const [insightsView, setInsightsView] = useState(null);
@@ -130,6 +133,28 @@ function Shell() {
     return () => clearInterval(id);
   }, [unlocked, lock, bumpActivity]);
 
+  /**
+   * Leave the current flow: cancel any open dApp approve/connect (site gets 4001),
+   * keep the wallet popup open, and clear the overlay UI.
+   * MUST stay above early returns — hooks cannot run after conditional returns (React #310).
+   */
+  const dismissDappPromptAsCancel = useCallback(() => {
+    sendRuntimeMessage({ type: 'DAPP_REJECT_SIGN', closeWindow: false });
+    sendRuntimeMessage({ type: 'DAPP_REJECT_CONNECT', closeWindow: false });
+    try {
+      window.dispatchEvent(new CustomEvent('voodoo:nav-away'));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /** Switch bottom-nav tab. Any open dApp approve/connect is treated as Cancel. */
+  const setTabActive = useCallback((id) => {
+    bumpActivity();
+    dismissDappPromptAsCancel();
+    setTab(id);
+  }, [bumpActivity, dismissDappPromptAsCancel]);
+
   if (loading) {
     return <BootShell />;
   }
@@ -149,26 +174,19 @@ function Shell() {
   };
   const ActivePage = tabPanels[tab] || Home;
 
-  const setTabActive = (id) => {
-    bumpActivity();
-    setTab(id);
-  };
-
   return (
     <TabNavProvider navigate={setTabActive}>
     <div className="app app-shell" ref={shellRef}>
-      <Suspense fallback={null}>
-        <DappPrompt />
-      </Suspense>
       <div className="header" ref={headerRef}>
         <div className="header-inner">
           <div className="header-brand">
             <img
-              src={appBrandLogoUrl()}
+              src={profilePicture || appBrandLogoUrl()}
               alt={t('app_name')}
-              className="header-brand-logo"
+              className={`header-brand-logo${profilePicture ? ' is-profile' : ''}`}
               width={52}
               height={52}
+              draggable={false}
             />
             <div>
               <h1>{t('app_name')}</h1>
@@ -186,11 +204,21 @@ function Shell() {
             </div>
           </div>
           <HeaderMenu
-            onImportWallet={() => setImportOpen(true)}
-            onOpenInsights={(view) => setInsightsView(view)}
+            onImportWallet={() => {
+              dismissDappPromptAsCancel();
+              setImportOpen(true);
+            }}
+            onOpenInsights={(view) => {
+              dismissDappPromptAsCancel();
+              setInsightsView(view);
+            }}
           />
         </div>
       </div>
+      {/* After header so connect/sign UI never sits above the brand bar */}
+      <Suspense fallback={null}>
+        <DappPrompt />
+      </Suspense>
       {importOpen && (
         <Suspense fallback={null}>
           <ImportWallet onClose={() => setImportOpen(false)} />
@@ -272,7 +300,9 @@ export default function App() {
     <ErrorBoundary>
       <I18nProvider>
         <WalletProvider>
-          <Shell />
+          <ProfilePictureProvider>
+            <Shell />
+          </ProfilePictureProvider>
         </WalletProvider>
       </I18nProvider>
     </ErrorBoundary>

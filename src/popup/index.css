@@ -173,8 +173,75 @@ body {
   height: 52px;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   flex-shrink: 0;
   image-rendering: auto;
+}
+
+.header-brand-logo.is-profile {
+  border: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Settings — profile picture (1:1 circle, Android-style) */
+.settings-profile-card .settings-toggle-hint {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.settings-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.settings-profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  border: 3px solid #fff;
+  background: var(--bg);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.settings-profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-profile-file-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.settings-profile-file-btn.is-busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.settings-profile-file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
 }
 
 .brand-logo {
@@ -453,6 +520,15 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  /* No visible scrollbar in the extension shell (still scrollable) */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .app-shell .app-scroll {
@@ -948,7 +1024,8 @@ body {
 
 .nav {
   position: relative;
-  z-index: 30;
+  /* ALWAYS above dapp-prompt overlay (90) so bottom functions never hide/disappear */
+  z-index: 160;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1808,37 +1885,433 @@ textarea { min-height: 72px; resize: vertical; }
   text-transform: uppercase;
 }
 
+/*
+ * DApp connect / sign — simple full-band screen
+ * Header + bottom nav stay visible; content is calm white wallet chrome
+ */
 .dapp-prompt {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  padding: 8px 16px 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--app-header-h, 81px);
+  bottom: var(--app-nav-h, 132px);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg);
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.dapp-prompt-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 12px 14px 10px;
+  border: none;
+  border-radius: 0;
+  background: var(--bg);
+  box-shadow: none;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* —— Simple modern layout (connect / approve / stake) —— */
+.dapp-prompt--simple .dapp-prompt-panel--simple,
+.dapp-prompt-panel--simple {
+  padding: 12px 14px 10px;
+  justify-content: flex-start; /* content top — no huge empty middle */
+  gap: 0;
+}
+
+.dapp-simple-body {
+  flex: 0 0 auto; /* never shrink away — Approve text must stay visible */
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start; /* top-aligned, not vertically centered */
+  gap: 10px;
+  overflow: visible;
+  padding-top: 2px;
+}
+
+.dapp-simple-kicker {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+}
+
+.dapp-simple-title {
+  margin: 0 0 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  line-height: 1.25;
+}
+
+.dapp-simple-subtitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: block !important;
+  visibility: visible !important;
+}
+
+.dapp-amount-chip--simple {
+  margin: 0;
+  padding: 12px 12px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+}
+
+.dapp-amount-chip--simple .dapp-amount-chip-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+}
+
+.dapp-simple-meta {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel2, #fff);
+  padding: 4px 14px;
+  flex: 0 0 auto;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.dapp-simple-meta-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted);
+  visibility: visible !important;
+}
+
+.dapp-simple-meta-row:last-child {
+  border-bottom: none;
+}
+
+.dapp-simple-meta-row strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dapp-account-list--simple {
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.dapp-account-row--simple {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.dapp-account-row--simple.dapp-account-row-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Cancel / Approve side-by-side — never stack or jam (override global .btn width:100%) */
+.dapp-prompt-panel--simple > .dapp-actions--simple,
+.dapp-actions.dapp-actions--simple {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  align-items: stretch;
+  gap: 10px !important;
+  margin-top: 14px !important;
+  padding: 12px 0 0 !important;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
   background: var(--bg);
 }
 
-.dapp-prompt-card { border: 2px solid var(--accent); }
+.dapp-actions--simple .btn,
+.dapp-actions.dapp-actions--simple > .btn {
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  min-height: 42px !important;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px !important;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+/* Approve: pack title + meta + buttons as one tight block at top */
+.dapp-prompt--simple .dapp-simple-body {
+  flex: 0 0 auto;
+}
+
+.dapp-prompt--simple .dapp-simple-title {
+  margin-bottom: 10px;
+}
+
+.dapp-prompt--simple .dapp-simple-meta {
+  margin: 0;
+}
+
+.dapp-prompt--simple .dapp-prompt-error {
+  margin-top: 8px;
+}
+
+
+/* Don't let older --fit rules squash action buttons together */
+.dapp-prompt--fit .dapp-actions.dapp-actions--simple {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+  margin-top: 14px !important;
+}
+
+.dapp-prompt--fit .dapp-actions.dapp-actions--simple .btn {
+  flex: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  white-space: nowrap;
+}
+
+.dapp-prompt--fit .dapp-prompt-panel {
+  padding: 12px 14px 10px;
+}
+
+.dapp-prompt-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto; /* allow overflow if needed, but never show a scrollbar */
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
+}
+
+/* Single-screen approve: no scroll, compact stack */
+.dapp-prompt-body--fit {
+  overflow: hidden !important;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.dapp-prompt--fit .dapp-prompt-site {
+  margin: 0 0 6px;
+  padding: 5px 8px;
+}
+
+.dapp-prompt--fit .dapp-prompt-heading {
+  font-size: 14px;
+  margin: 0 0 2px;
+  line-height: 1.2;
+}
+
+.dapp-prompt--fit .dapp-prompt-lead {
+  font-size: 11px;
+  margin: 0 0 6px;
+  line-height: 1.3;
+}
+
+.dapp-prompt--fit .dapp-section-label {
+  margin: 0 0 4px;
+  font-size: 9px;
+}
+
+.dapp-prompt--fit .dapp-prompt-block {
+  margin-bottom: 6px;
+}
+
+.dapp-prompt--fit .dapp-prompt-block--grow {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 6px;
+}
+
+.dapp-prompt--fit .dapp-prompt-details {
+  padding: 0 10px;
+}
+
+.dapp-prompt--fit .dapp-detail-row {
+  padding: 5px 0;
+  font-size: 11px;
+  gap: 6px;
+}
+
+.dapp-prompt--fit .dapp-detail-value {
+  font-size: 11px;
+  max-width: 62%;
+}
+
+.dapp-prompt--fit .dapp-hint,
+.dapp-prompt--fit .dapp-warning {
+  margin: 0 0 0;
+  padding: 6px 8px;
+  font-size: 10px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.dapp-prompt--fit .dapp-actions {
+  padding: 6px 0 0;
+  margin-top: 6px;
+}
+
+.dapp-prompt--fit .dapp-actions .btn {
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.dapp-prompt--fit .dapp-amount-chip {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+}
+
+.dapp-prompt--fit .dapp-amount-chip-value {
+  font-size: 18px;
+}
+
+.dapp-prompt-body::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent;
+}
+
+.dapp-prompt-friendly {
+  /* no special border — full screen page look */
+}
+
+.dapp-prompt-site {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--panel2, #f7f8f9);
+  border: 1px solid var(--border);
+}
+
+.dapp-prompt-site-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+}
+
+.dapp-prompt-site-host {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dapp-prompt-heading {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 4px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.dapp-prompt-lead {
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0 0 8px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.dapp-prompt-block {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.dapp-prompt-block-accounts {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.dapp-prompt-details {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2, #f7f8f9);
+  padding: 0 12px;
+  /* Fit approve/stake summary without a visible scrollbar */
+  max-height: none;
+  overflow: visible;
+}
+
+.dapp-prompt-error {
+  margin: 0 0 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
 
 .dapp-host {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  margin: 4px 0 8px;
+  margin: 2px 0 6px;
   word-break: break-all;
 }
 
 .dapp-request-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--accent);
 }
 
 .dapp-detail-row {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  padding: 8px 0;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .dapp-detail-row:last-of-type { border-bottom: none; }
@@ -1846,27 +2319,374 @@ textarea { min-height: 72px; resize: vertical; }
 .dapp-detail-value {
   text-align: right;
   word-break: break-all;
-  max-width: 60%;
+  max-width: 58%;
   font-weight: 500;
 }
 
+.dapp-detail-row-em .dapp-detail-value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Stake amount hero — consistent with wallet card panels */
+.dapp-amount-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 14px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel2, #f7f8f9);
+  flex-shrink: 0;
+}
+
+.dapp-amount-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.dapp-amount-chip-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* —— Approve / Stake progress + success (in-wallet UX) —— */
+.dapp-status-body {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden !important;
+}
+
+.dapp-status-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 12px 8px 8px;
+  box-sizing: border-box;
+}
+
+/* Success icon: green mark on white (no black plate) */
+.dapp-success-icon-wrap {
+  width: 88px;
+  height: 88px;
+  margin: 8px 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  animation: dapp-success-pop 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+.dapp-success-icon {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  /* Source PNG has black bg — show only the bright green check */
+  mix-blend-mode: darken;
+  background: transparent;
+}
+
+.dapp-success-svg {
+  width: 56px;
+  height: 56px;
+  display: block;
+}
+
+@keyframes dapp-success-pop {
+  0% { opacity: 0; transform: scale(0.55); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.dapp-progress-ring {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  margin: 8px 0 14px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.dapp-progress-svg {
+  width: 88px;
+  height: 88px;
+  transform: rotate(-90deg);
+}
+
+.dapp-progress-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 6;
+}
+
+.dapp-progress-bar {
+  fill: none;
+  /* Solid wallet accent — no gradient */
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s ease;
+}
+
+.dapp-progress-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dapp-status-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.dapp-status-card.is-success .dapp-status-title {
+  /* Same success green as .success elsewhere in the wallet */
+  color: #059669;
+}
+
+.dapp-status-amount {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dapp-status-sub {
+  margin: 0 0 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  max-width: 260px;
+}
+
+.dapp-progress-track-line {
+  width: 100%;
+  max-width: 240px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.dapp-progress-track-fill {
+  height: 100%;
+  border-radius: 999px;
+  /* Solid accent only — matches buttons / wallet chrome */
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+
+.dapp-status-done {
+  width: 100%;
+  max-width: 220px;
+  margin-top: 8px;
+  min-height: 40px;
+}
+
 .dapp-warning {
-  margin: 10px 0 0;
-  padding: 10px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
   background: rgba(229, 115, 115, 0.12);
   border: 1px solid rgba(229, 115, 115, 0.35);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 11px;
   color: #e57373;
+  line-height: 1.35;
+  flex-shrink: 0;
 }
 
+.dapp-hint {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+  flex-shrink: 0;
+}
+
+/* Pinned to bottom of content band — always visible above footer nav */
 .dapp-actions {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: auto;
+  padding: 8px 0 0;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
 }
 
-.dapp-actions .btn { flex: 1; }
+.dapp-actions .btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+  min-height: 40px;
+}
+
+.dapp-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 6px;
+  flex-shrink: 0;
+}
+
+.dapp-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.dapp-account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2, #f7f8f9);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.dapp-account-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
+.dapp-account-row-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dapp-account-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+
+/* Custom profile photo on connect account picker (1:1 circle) */
+.dapp-account-avatar-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+}
+
+.dapp-account-avatar-img.is-profile {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.dapp-account-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-left: auto;
+}
+
+.dapp-account-radio.is-on {
+  border-color: var(--accent);
+  background: radial-gradient(circle at center, var(--accent) 0 45%, transparent 48%);
+}
+
+.dapp-account-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dapp-account-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.dapp-account-addr {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.dapp-perm-list {
+  margin: 0;
+  padding: 10px 12px 10px 26px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2, #f7f8f9);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  list-style: disc;
+}
+
+.dapp-perm-list li {
+  margin: 0;
+}
+
+.dapp-perm-list li + li {
+  margin-top: 4px;
+}
 
 .modal-overlay {
   position: fixed;

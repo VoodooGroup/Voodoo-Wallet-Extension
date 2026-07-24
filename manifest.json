@@ -62,8 +62,8 @@
       "resources": [
         "dist/assets/*",
         "dist/public/*",
-        "dist/assets/provider.js-D6HM1G-q.js",
-        "dist/assets/bridge.js-Cz9IDdYz.js",
+        "dist/assets/provider.js-Dbmbnxs9.js",
+        "dist/assets/bridge.js-C0XV-NSR.js",
         "content-bridge-root.js"
       ],
       "use_dynamic_url": false
@@ -74,7 +74,7 @@
         "https://*/*"
       ],
       "resources": [
-        "dist/assets/provider.js-D6HM1G-q.js",
+        "dist/assets/provider.js-Dbmbnxs9.js",
         "dist/assets/*",
         "content-bridge-root.js"
       ],

@@ -38,9 +38,10 @@ class VoodooEthereumProvider {
 
   async request({ method, params = [] }) {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const isConnect = method === 'eth_requestAccounts' || method === 'wallet_requestPermissions';
-    const timeoutMs = isConnect ? 90000 : 25000;
 
+    // NEVER time out wallet-user actions (connect / approve / stake / sign).
+    // If the user clicks Approve on a dApp but does not open the extension,
+    // the request stays pending silently — no TIMEOUT / "geen antwoord" popup.
     return new Promise((resolve, reject) => {
       let settled = false;
 
@@ -48,7 +49,6 @@ class VoodooEthereumProvider {
         if (settled) return;
         settled = true;
         window.removeEventListener('message', handler);
-        clearTimeout(timer);
         clearInterval(pollTimer);
         fn(value);
       };
@@ -56,12 +56,20 @@ class VoodooEthereumProvider {
       const handler = (event) => {
         if (event.source !== window || event.data?.target !== 'voodoo-inpage') return;
         if (event.data.id !== id) return;
-        // Accept any message with our id (type optional)
-        if (event.data.error) {
-          const err = new Error(event.data.error.message || 'Wallet request failed');
-          err.code = event.data.error.code;
+
+        // Only reject when error is actually present (never send error:null on success)
+        if (event.data.error != null) {
+          const errPayload = event.data.error;
+          const err = new Error(
+            (typeof errPayload === 'string' ? errPayload : errPayload.message)
+            || 'Wallet request failed',
+          );
+          err.code = typeof errPayload === 'object' ? errPayload.code : undefined;
           finish(reject, err);
-        } else if ('result' in event.data || event.data.type === 'VOODOO_DAPP_RESPONSE') {
+          return;
+        }
+
+        if ('result' in event.data || event.data.type === 'VOODOO_DAPP_RESPONSE') {
           const result = event.data.result;
           if (Array.isArray(result) && result[0]) {
             this.selectedAddress = result[0];
@@ -70,26 +78,14 @@ class VoodooEthereumProvider {
         }
       };
 
+      // Poll forever for a reply — no setTimeout reject, no VOODOO_TIMEOUT
       const pollTimer = setInterval(() => {
         window.postMessage({
           target: 'voodoo-contentscript',
           type: 'VOODOO_POLL_RESPONSE',
           id,
         }, '*');
-      }, 400);
-
-      const timer = setTimeout(() => {
-        finish(reject, Object.assign(
-          new Error(
-            'TIMEOUT (90s): Wallet gaf geen antwoord.\n'
-            + '1) Open Voodoo Wallet en log IN\n'
-            + '2) chrome://extensions → Reload\n'
-            + '3) Deze pagina Ctrl+F5\n'
-            + '4) Opnieuw verbinden',
-          ),
-          { code: 'VOODOO_TIMEOUT' },
-        ));
-      }, timeoutMs);
+      }, 600);
 
       window.addEventListener('message', handler);
       window.postMessage({
@@ -102,26 +98,43 @@ class VoodooEthereumProvider {
     });
   }
 
-  async send(methodOrPayload, paramsOrCallback) {
-    if (typeof methodOrPayload === 'string') {
-      return this.request({ method: methodOrPayload, params: paramsOrCallback || [] });
-    }
-    const payload = methodOrPayload || {};
-    const result = await this.request({
-      method: payload.method,
-      params: payload.params || [],
-    });
-    if (typeof paramsOrCallback === 'function') {
-      paramsOrCallback(null, { id: payload.id, jsonrpc: '2.0', result });
+  /**
+   * ethers v5 Web3Provider / legacy web3 compatibility.
+   * Supports: send(method, params) → Promise
+   *           send(payload, callback)
+   */
+  send(methodOrPayload, paramsOrCallback) {
+    // Callback style: send({ method, params, id }, cb)
+    if (methodOrPayload && typeof methodOrPayload === 'object' && typeof paramsOrCallback === 'function') {
+      const payload = methodOrPayload;
+      this.request({ method: payload.method, params: payload.params || [] })
+        .then((result) => {
+          paramsOrCallback(null, { id: payload.id, jsonrpc: '2.0', result });
+        })
+        .catch((error) => {
+          paramsOrCallback(error, {
+            id: payload.id,
+            jsonrpc: '2.0',
+            error: { message: error?.message || String(error), code: error?.code },
+          });
+        });
       return undefined;
     }
-    return result;
+
+    // Promise style: send(method, params)
+    const method = methodOrPayload;
+    const params = Array.isArray(paramsOrCallback) ? paramsOrCallback : (paramsOrCallback || []);
+    return this.request({ method, params });
   }
 
   sendAsync(payload, callback) {
     this.request({ method: payload.method, params: payload.params || [] })
       .then((result) => callback(null, { id: payload.id, jsonrpc: '2.0', result }))
-      .catch((error) => callback(error, null));
+      .catch((error) => callback(error, {
+        id: payload?.id,
+        jsonrpc: '2.0',
+        error: { message: error?.message || String(error), code: error?.code },
+      }));
   }
 
   setConnected(address) {

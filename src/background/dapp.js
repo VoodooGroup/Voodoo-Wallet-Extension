@@ -1,4 +1,4 @@
-import { FallbackProvider, JsonRpcProvider } from 'ethers';
+import { JsonRpcProvider } from 'ethers';
 import { PULSECHAIN_RPC_URLS } from '../config/rpc.js';
 import {
   isReadOnlyRpcMethod,
@@ -8,20 +8,34 @@ import {
   requestsAccountPermission,
 } from '../lib/dapp-methods.js';
 
-let rpcProvider;
+/** Cached JsonRpcProviders per URL (ethers v6 FallbackProvider has no .send()). */
+const rpcByUrl = new Map();
 
-function getRpc() {
-  if (!rpcProvider) {
-    rpcProvider = new FallbackProvider(
-      PULSECHAIN_RPC_URLS.map((url, priority) => ({
-        provider: new JsonRpcProvider(url, PULSECHAIN_CHAIN_ID),
-        priority,
-        stallTimeout: 2500,
-      })),
-      PULSECHAIN_CHAIN_ID,
-    );
+function getJsonRpc(url) {
+  let p = rpcByUrl.get(url);
+  if (!p) {
+    p = new JsonRpcProvider(url, PULSECHAIN_CHAIN_ID);
+    rpcByUrl.set(url, p);
   }
-  return rpcProvider;
+  return p;
+}
+
+/**
+ * JSON-RPC via public PulseChain endpoints with failover.
+ * Used for eth_call / eth_estimateGas / eth_getBalance etc. from dApps.
+ * Must use JsonRpcProvider.send — NOT FallbackProvider (no .send in ethers v6).
+ */
+async function rpcSend(method, params = []) {
+  let lastErr;
+  for (const url of PULSECHAIN_RPC_URLS) {
+    try {
+      return await getJsonRpc(url).send(method, params);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[Voodoo RPC] ${method} failed on ${url}:`, err?.message || err);
+    }
+  }
+  throw lastErr || new Error(`RPC ${method} failed on all endpoints`);
 }
 
 async function getState() {
@@ -40,13 +54,16 @@ async function setState(patch) {
 /** Per-request reply store so content scripts can poll by id */
 async function storeReply(id, result, error = null) {
   if (!id) return;
+  // Omit null error so inpage never confuses empty error with a failure
   const payload = {
     type: 'VOODOO_DAPP_RESPONSE',
     id,
     result: result ?? null,
-    error: error ?? null,
     ts: Date.now(),
   };
+  if (error != null) {
+    payload.error = error;
+  }
   try {
     const { dappReplies = {} } = await chrome.storage.local.get('dappReplies');
     const next = { ...dappReplies, [id]: payload };
@@ -151,17 +168,33 @@ async function broadcastAccountsForConnections() {
   }));
 }
 
+function pendingBadgeTitle(state) {
+  if (state.pendingConnect) {
+    return state.pendingConnect.needsUnlock
+      ? 'Voodoo Wallet — Unlock, then connect'
+      : 'Voodoo Wallet — Choose account & Connect';
+  }
+  if (state.pendingSign) {
+    const method = state.pendingSign.method || '';
+    const data = String(state.pendingSign.params?.[0]?.data || '').toLowerCase();
+    if (method === 'eth_sendTransaction' && data.startsWith('0x095ea7b3')) {
+      return 'Voodoo Wallet — Approve token spending';
+    }
+    if (method === 'eth_sendTransaction') {
+      return 'Voodoo Wallet — Confirm transaction';
+    }
+    return 'Voodoo Wallet — Approve request';
+  }
+  return 'Voodoo Wallet';
+}
+
 export async function refreshActionBadge(state = null) {
   const current = state || await getState();
   const pending = current.pendingConnect || current.pendingSign;
   if (pending) {
     await chrome.action.setBadgeText({ text: '!' });
     await chrome.action.setBadgeBackgroundColor({ color: '#D73847' });
-    await chrome.action.setTitle({
-      title: current.pendingConnect
-        ? 'Voodoo Wallet — Unlock to connect site'
-        : 'Voodoo Wallet — Approve request',
-    });
+    await chrome.action.setTitle({ title: pendingBadgeTitle(current) });
   } else {
     await chrome.action.setBadgeText({ text: '' });
     await chrome.action.setTitle({ title: 'Voodoo Wallet' });
@@ -173,21 +206,99 @@ async function isOriginConnected(origin) {
   return (state.connections || {})[origin] === true;
 }
 
-async function tryOpenWalletPopup() {
+/** Last chrome.windows popup opened for dApp approve/connect (service-worker memory). */
+let approvalWindowId = null;
+
+function getPopupPageUrl() {
+  try {
+    const path = chrome.runtime.getManifest()?.action?.default_popup
+      || 'src/popup/index.html';
+    return chrome.runtime.getURL(path);
+  } catch {
+    return chrome.runtime.getURL('src/popup/index.html');
+  }
+}
+
+/**
+ * Open the wallet UI for a pending dApp request.
+ * chrome.action.openPopup() usually fails from the service worker (no extension
+ * user-gesture). Fallback: focused popup window so Approve always appears.
+ */
+async function openWalletForApproval() {
+  // 1) Try toolbar popup (works only in rare gesture-propagating cases)
   try {
     if (chrome.action?.openPopup) {
       await chrome.action.openPopup();
       return true;
     }
   } catch {
-    /* badge still prompts user */
+    /* expected on most Chrome builds when called from SW */
   }
-  return false;
+
+  // 2) Focus existing approval window if still open
+  if (approvalWindowId != null && chrome.windows?.update) {
+    try {
+      await chrome.windows.update(approvalWindowId, { focused: true, drawAttention: true });
+      return true;
+    } catch {
+      approvalWindowId = null;
+    }
+  }
+
+  // 3) Find any already-open Voodoo popup/tab with our popup page
+  const popupUrl = getPopupPageUrl();
+  try {
+    const tabs = await chrome.tabs.query({ url: `${chrome.runtime.getURL('')}*` });
+    const existing = tabs.find((t) => t.url && (
+      t.url === popupUrl
+      || t.url.startsWith(popupUrl)
+      || t.url.includes('/popup/index.html')
+    ));
+    if (existing?.windowId != null) {
+      approvalWindowId = existing.windowId;
+      await chrome.windows.update(existing.windowId, { focused: true, drawAttention: true });
+      if (existing.id != null) {
+        await chrome.tabs.update(existing.id, { active: true });
+      }
+      return true;
+    }
+  } catch {
+    /* ignore query failures */
+  }
+
+  // 4) Open a dedicated popup window (reliable for dApp Approve / Connect)
+  try {
+    const win = await chrome.windows.create({
+      url: popupUrl,
+      type: 'popup',
+      width: 400,
+      height: 640,
+      focused: true,
+    });
+    approvalWindowId = win?.id ?? null;
+    return Boolean(win?.id);
+  } catch (err) {
+    console.warn('[Voodoo] openWalletForApproval failed', err?.message || err);
+    return false;
+  }
 }
 
 async function queueUserApproval(type, payload) {
   await setState({ [type]: { ...payload, createdAt: Date.now() } });
-  await tryOpenWalletPopup();
+  // Always set badge so toolbar shows "!" even if window open is delayed
+  await refreshActionBadge();
+
+  let opened = await openWalletForApproval();
+  if (!opened) {
+    // Service worker may still be waking — retry shortly
+    await new Promise((r) => setTimeout(r, 200));
+    opened = await openWalletForApproval();
+  }
+  if (!opened) {
+    setTimeout(() => {
+      openWalletForApproval().catch(() => {});
+    }, 500);
+  }
 }
 
 /**
@@ -207,24 +318,23 @@ export async function handleDappRequest(msg, tabId = null) {
 
   try {
     if (requestsAccountPermission(method, params)) {
-      // Unlocked → connect immediately (site button click = consent)
-      if (activeAddress) {
-        const connections = { ...(state.connections || {}), [origin]: true };
-        await setState({ connections, pendingConnect: null });
+      // Already connected to this origin with an unlocked account → return immediately
+      // (MetaMask-style: no second prompt if site is already approved)
+      if (activeAddress && (await isOriginConnected(origin))) {
         await broadcastAccountsToTab(tabId, [activeAddress]);
-        await broadcastAccountsToOrigin(origin, [activeAddress]);
         return done([activeAddress], null);
       }
 
-      // Locked → wait for unlock (auto-approve in setActiveAddress)
+      // Always show account-picker connect screen in the popup (like MetaMask).
+      // User must pick an account and press Connect — never auto-approve.
       await queueUserApproval('pendingConnect', {
         id,
         origin,
         hostname: msg.hostname,
         tabId,
-        needsUnlock: true,
+        needsUnlock: !activeAddress,
       });
-      return { pending: true, needsUnlock: true };
+      return { pending: true, needsUnlock: !activeAddress };
     }
 
     switch (method) {
@@ -292,7 +402,8 @@ export async function handleDappRequest(msg, tabId = null) {
         }
 
         if (isReadOnlyRpcMethod(method)) {
-          const result = await getRpc().send(method, params);
+          // eth_estimateGas / eth_call during Approve & Stake
+          const result = await rpcSend(method, params);
           return done(result, null);
         }
 
@@ -322,7 +433,12 @@ export async function approveConnect(origin, addressOverride = null) {
   const connections = { ...(state.connections || {}) };
   if (targetOrigin) connections[targetOrigin] = true;
 
-  await setState({ connections, pendingConnect: null });
+  // Persist selected account as active for future dApp calls
+  await setState({
+    connections,
+    pendingConnect: null,
+    activeAddress: address,
+  });
   const accounts = [address];
 
   if (requestId) {
@@ -332,10 +448,28 @@ export async function approveConnect(origin, addressOverride = null) {
   if (targetOrigin) {
     await broadcastAccountsToOrigin(targetOrigin, accounts);
   }
+  await refreshActionBadge();
+  await closeApprovalWindow();
   return { ok: true, accounts };
 }
 
-export async function rejectConnect() {
+/** Close dedicated approve/connect popup window (not the toolbar popup). */
+async function closeApprovalWindow() {
+  const id = approvalWindowId;
+  approvalWindowId = null;
+  if (id == null || !chrome.windows?.remove) return;
+  try {
+    await chrome.windows.remove(id);
+  } catch {
+    /* already closed */
+  }
+}
+
+/**
+ * @param {{ closeWindow?: boolean }} [opts]
+ * closeWindow: false when user switches wallet tabs (stay in popup, treat as cancel)
+ */
+export async function rejectConnect({ closeWindow = true } = {}) {
   const state = await getState();
   if (state.pendingConnect?.id) {
     await respond(
@@ -347,6 +481,8 @@ export async function rejectConnect() {
     );
   }
   await setState({ pendingConnect: null });
+  await refreshActionBadge();
+  if (closeWindow) await closeApprovalWindow();
 }
 
 export async function approveSign(result) {
@@ -361,9 +497,15 @@ export async function approveSign(result) {
     );
   }
   await setState({ pendingSign: null });
+  await refreshActionBadge();
+  // Keep window open for in-wallet progress → success UI
 }
 
-export async function rejectSign() {
+/**
+ * @param {{ closeWindow?: boolean }} [opts]
+ * closeWindow: false when user switches wallet tabs (stay in popup, treat as cancel)
+ */
+export async function rejectSign({ closeWindow = true } = {}) {
   const state = await getState();
   if (state.pendingSign?.id) {
     await respond(
@@ -375,20 +517,14 @@ export async function rejectSign() {
     );
   }
   await setState({ pendingSign: null });
+  await refreshActionBadge();
+  if (closeWindow) await closeApprovalWindow();
 }
 
 export async function setActiveAddress(address) {
   const state = await setState({ activeAddress: address || null });
   await broadcastAccountsForConnections();
-
-  if (address && state.pendingConnect?.id) {
-    try {
-      await approveConnect(state.pendingConnect.origin, address);
-    } catch (e) {
-      console.warn('Auto-approve pending connect failed', e);
-    }
-  }
-
+  // Do not auto-approve pending connect — user picks account in DappPrompt (MetaMask-style).
   return state;
 }
 

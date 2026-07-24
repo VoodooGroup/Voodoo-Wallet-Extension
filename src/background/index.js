@@ -98,17 +98,18 @@ async function handleRuntimeMessage(message, sender) {
       await disconnectOrigin(message.origin);
       return { ok: true };
     case 'DAPP_APPROVE_CONNECT': {
-      const result = await approveConnect(message.origin);
+      // Optional address from account picker in DappPrompt
+      const result = await approveConnect(message.origin, message.address || null);
       return result?.ok === false ? result : { ok: true, ...result };
     }
     case 'DAPP_REJECT_CONNECT':
-      await rejectConnect();
+      await rejectConnect({ closeWindow: message.closeWindow !== false });
       return { ok: true };
     case 'DAPP_APPROVE_SIGN':
       await approveSign(message.result);
       return { ok: true };
     case 'DAPP_REJECT_SIGN':
-      await rejectSign();
+      await rejectSign({ closeWindow: message.closeWindow !== false });
       return { ok: true };
     case 'NOTIFY_SET_ENABLED':
       await setIncomingNotificationsEnabled(Boolean(message.enabled));

@@ -1,0 +1,1 @@
+BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141");BigInt("1000000000000000000");const f=BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");BigInt("0x8000000000000000000000000000000000000000000000000000000000000000")*BigInt(-1);BigInt("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");export{f as M};

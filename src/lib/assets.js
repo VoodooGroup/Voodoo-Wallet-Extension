@@ -19,6 +19,7 @@ const PUBLIC_FILES = new Set([
   'token-plsx.webp',
   'token-prvx.webp',
   'warning.png',
+  'success-check.png',
   'reset-button.png',
   'tier-bronze.png',
   'tier-silver.png',
@@ -181,4 +182,12 @@ export function logoutIconUrl() {
     return chrome.runtime.getURL('public/logout.png');
   }
   return '/public/logout.png';
+}
+
+/** Green check — dApp approve/stake success */
+export function successCheckIconUrl() {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL('public/success-check.png');
+  }
+  return '/public/success-check.png';
 }

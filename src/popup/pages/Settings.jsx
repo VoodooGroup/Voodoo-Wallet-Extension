@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { useI18n } from '../../context/I18nContext.jsx';
+import { useProfilePicture } from '../../context/ProfilePictureContext.jsx';
 import { WALLET_LOCALES } from '../../lib/i18n/locales.js';
 import { FIAT_CURRENCIES } from '../../lib/fiat';
 import { DEFAULT_THEME } from '../../lib/theme';
 import { getAutoLockMs } from '../../lib/auto-lock';
-import { currencyIconUrl, localeFlagUrl } from '../../lib/assets';
+import { appBrandLogoUrl, currencyIconUrl, localeFlagUrl } from '../../lib/assets';
 import { openPrivacyPolicy } from '../../lib/privacy';
 import { openContributeGitHub, openFeedbackEmail } from '../../lib/feedback';
 import { translateError } from '../../lib/i18n/translate-error.js';
@@ -61,6 +62,13 @@ export default function Settings() {
     devDemoBalance,
     setDevDemoBalance,
   } = useWallet();
+  const {
+    profilePicture,
+    setFromFile: setProfileFromFile,
+    clear: clearProfilePicture,
+  } = useProfilePicture();
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState('');
   const [notifStatus, setNotifStatus] = useState('');
   const [priceAlertStatus, setPriceAlertStatus] = useState('');
   const [richlistHomeEnabled, setRichlistHomeEnabledState] = useState(true);
@@ -568,8 +576,83 @@ export default function Settings() {
     );
   }
 
+  const handleProfilePick = async (e) => {
+    const file = e.target?.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setProfileBusy(true);
+    setProfileError('');
+    try {
+      await setProfileFromFile(file);
+    } catch {
+      setProfileError(t('settings_profile_picture_error'));
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
+  const handleProfileRemove = async () => {
+    setProfileBusy(true);
+    setProfileError('');
+    try {
+      await clearProfilePicture();
+    } catch {
+      setProfileError(t('settings_profile_picture_error'));
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
   return (
     <>
+      <div className="card settings-profile-card">
+        <div className="label">{t('settings_profile_picture')}</div>
+        <p className="muted settings-toggle-hint">{t('settings_profile_picture_hint')}</p>
+        <div className="settings-profile-row">
+          <img
+            src={profilePicture || appBrandLogoUrl()}
+            alt=""
+            className="settings-profile-avatar"
+            width={64}
+            height={64}
+            draggable={false}
+          />
+          <div className="settings-profile-actions">
+            <label className={`btn btn-secondary settings-profile-file-btn${profileBusy ? ' is-busy' : ''}`}>
+              {profileBusy
+                ? '…'
+                : (profilePicture
+                  ? t('settings_profile_picture_change')
+                  : t('settings_profile_picture_choose'))}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={profileBusy}
+                onChange={handleProfilePick}
+                className="settings-profile-file-input"
+              />
+            </label>
+            {profilePicture ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={profileBusy}
+                onClick={handleProfileRemove}
+              >
+                {t('settings_profile_picture_remove')}
+              </button>
+            ) : (
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                {t('settings_profile_picture_none')}
+              </p>
+            )}
+          </div>
+        </div>
+        {profileError && (
+          <p className="error" style={{ fontSize: 12, marginTop: 8 }}>{profileError}</p>
+        )}
+      </div>
+
       <div className="card">
         <div className="label">{t('settings_language')}</div>
         <p className="muted">{t('settings_language_hint')}</p>

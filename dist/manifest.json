@@ -46,7 +46,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/bridge.js-Cz9IDdYz.js"
+        "assets/bridge.js-C0XV-NSR.js"
       ],
       "matches": [
         "<all_urls>"
@@ -62,8 +62,8 @@
       "resources": [
         "assets/*",
         "public/*",
-        "assets/provider.js-D6HM1G-q.js",
-        "assets/bridge.js-Cz9IDdYz.js"
+        "assets/provider.js-Dbmbnxs9.js",
+        "assets/bridge.js-C0XV-NSR.js"
       ],
       "use_dynamic_url": false
     },
@@ -73,7 +73,7 @@
         "https://*/*"
       ],
       "resources": [
-        "assets/provider.js-D6HM1G-q.js"
+        "assets/provider.js-Dbmbnxs9.js"
       ],
       "use_dynamic_url": false
     }

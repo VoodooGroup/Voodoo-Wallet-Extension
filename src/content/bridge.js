@@ -38,14 +38,17 @@ function forwardToPage(message) {
 
 function forwardDappResponse(payload) {
   if (!payload || !payload.id) return;
-  // Ensure type for page handler
-  forwardToPage({
+  // Ensure type for page handler — only include error when present
+  const msg = {
     type: 'VOODOO_DAPP_RESPONSE',
     id: payload.id,
     result: payload.result ?? null,
-    error: payload.error ?? null,
     ts: payload.ts || Date.now(),
-  });
+  };
+  if (payload.error != null) {
+    msg.error = payload.error;
+  }
+  forwardToPage(msg);
 }
 
 injectProvider();
@@ -144,12 +147,11 @@ window.addEventListener('message', (event) => {
       return;
     }
 
-    // Pending unlock: keep polling storage for this id
+    // Pending user action (connect / approve / stake / sign):
+    // Poll FOREVER — never timeout-reject. User may open the extension much later.
+    // A TIMEOUT popup when they ignore the wallet is ugly UX.
     if (response?.pending) {
-      let tries = 0;
-      const maxTries = 200; // ~100s
       const timer = setInterval(() => {
-        tries += 1;
         chrome.runtime.sendMessage({ type: 'DAPP_POLL_RESPONSE', id: requestId }, (res) => {
           if (chrome.runtime.lastError) return;
           if (res?.found && res.payload) {
@@ -157,7 +159,6 @@ window.addEventListener('message', (event) => {
             forwardDappResponse(res.payload);
           }
         });
-        if (tries >= maxTries) clearInterval(timer);
       }, 500);
     }
   });

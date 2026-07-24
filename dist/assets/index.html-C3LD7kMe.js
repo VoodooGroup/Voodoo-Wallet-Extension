@@ -1,1 +1,0 @@
-import{a as e,D as t,w as a,b as r,c as l,j as p,A as o}from"./index-BuYNXFdg.js";import"./price-alerts-DAYfpimG.js";e(t);document.documentElement.style.setProperty("--wallpaper-image",`url("${a()}")`);r();l.createRoot(document.getElementById("root")).render(p.jsx(o,{}));
