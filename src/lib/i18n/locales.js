@@ -1,5 +1,18 @@
 /** @typedef {{ code: string, name: string, nativeName: string }} LocaleOption */
 
+/** Fully translated wallet languages (settings dropdown). */
+/** @type {LocaleOption[]} */
+export const WALLET_LOCALES = [
+  { code: 'en', name: 'English', nativeName: 'English' },
+  { code: 'zh', name: 'Chinese', nativeName: '简体中文' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español' },
+  { code: 'fr', name: 'French', nativeName: 'Français' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
+  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
+  { code: 'nl', name: 'Dutch', nativeName: 'Nederlands' },
+];
+
 /** @type {LocaleOption[]} */
 export const LOCALES = [
   { code: 'en', name: 'English', nativeName: 'English' },
@@ -13,7 +26,7 @@ export const LOCALES = [
   { code: 'tr', name: 'Turkish', nativeName: 'Türkçe' },
   { code: 'ru', name: 'Russian', nativeName: 'Русский' },
   { code: 'uk', name: 'Ukrainian', nativeName: 'Українська' },
-  { code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文' },
+  { code: 'zh', name: 'Chinese', nativeName: '简体中文' },
   { code: 'ja', name: 'Japanese', nativeName: '日本語' },
   { code: 'ko', name: 'Korean', nativeName: '한국어' },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
@@ -36,6 +49,11 @@ export const LOCALES = [
 ];
 
 export const DEFAULT_LOCALE = 'en';
+
+/** @returns {LocaleOption[]} */
+export function getWalletLocales() {
+  return WALLET_LOCALES;
+}
 
 export function isRtlLocale(code) {
   return code === 'ar' || code === 'he' || code === 'fa';

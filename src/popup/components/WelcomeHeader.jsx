@@ -13,7 +13,7 @@ export default function WelcomeHeader({ title, tagline }) {
         width={180}
         height={180}
       />
-      <h1>{title}</h1>
+      <h1 className="welcome-title">{title}</h1>
       {tagline ? <p className="muted welcome-tagline">{tagline}</p> : null}
     </div>
   );

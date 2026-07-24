@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Voodoo Wallet — Home</title>
+<link rel="stylesheet" href="../dist/assets/index-BL1ukM1j.css" />
+<link rel="stylesheet" href="real-ui-shell.css" />
+<style>
+  /* Override popup body lock for product frame */
+  html, body {
+    width: 1920px !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 1080px !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #061820 !important;
+  }
+  .phone-inner {
+    --wallpaper-fallback: #0a2f3a;
+    --wallpaper-image: url("../dist/public/voodoo-token-background.png");
+  }
+  .phone-inner .app-shell {
+    background-size: cover;
+    background-position: center;
+  }
+  .phone-inner .app-scroll {
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+    flex: 1;
+  }
+  .phone-inner .content { padding-bottom: 8px; }
+  .phone-inner .home-balance-amount { font-size: 32px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="copy">
+      <div class="kicker">Voodoo Wallet · Chrome extension</div>
+      <h1>See your portfolio at a glance</h1>
+      <p>Balances, tokens, and your account — all in one clean PulseChain home screen.</p>
+      <div class="brand">
+        <img src="../dist/public/voodoo-wallet-logo.jpg" alt="" />
+        <span>Real product UI · PulseChain only</span>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="app app-shell" style="display:flex;flex-direction:column;height:560px;">
+          <div class="header">
+            <div class="header-inner">
+              <div class="header-brand">
+                <img src="../dist/public/voodoo-wallet-logo.jpg" alt="Voodoo Wallet" class="header-brand-logo" width="52" height="52" style="border-radius:12px;object-fit:cover;" />
+                <div>
+                  <h1 style="font-size:16px;margin:0;">Voodoo Wallet</h1>
+                  <p class="header-network" style="display:flex;align-items:center;gap:6px;margin:2px 0 0;font-size:12px;color:var(--muted);">
+                    <img src="../dist/public/pulsechain-logo-40.png" alt="" width="16" height="16" />
+                    PulseChain
+                  </p>
+                </div>
+              </div>
+              <button type="button" class="header-menu-btn" aria-label="Menu">
+                <span class="header-menu-line"></span>
+                <span class="header-menu-line"></span>
+                <span class="header-menu-line"></span>
+              </button>
+            </div>
+          </div>
+          <div class="app-scroll" style="flex:1;overflow:hidden;">
+            <div class="content home-wrap">
+              <div class="card home-hero">
+                <div class="home-hero-top">
+                  <div class="home-account-chip">
+                    <span class="home-account-name">Account 1</span>
+                    <div class="home-account-address">
+                      <span>0x7a3F…9c2B</span>
+                    </div>
+                  </div>
+                  <div class="home-hero-actions">
+                    <button type="button" class="home-lock-btn" aria-label="Lock">
+                      <img src="../dist/public/logout.png" alt="" class="home-lock-icon" width="18" height="18" />
+                    </button>
+                  </div>
+                </div>
+                <div class="home-balance-hero">
+                  <div class="home-balance-label">Portfolio (USD)</div>
+                  <div class="home-balance-amount">$1,284.50</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="token-item" style="margin:0;background:transparent;border:none;padding:0;">
+                  <div class="token-meta" style="display:flex;align-items:center;gap:10px;">
+                    <span class="token-dot dot-pls">PLS</span>
+                    <div class="token-symbol">Pulse (PLS)</div>
+                  </div>
+                  <span class="token-balance">12,450.3200</span>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="label">Tokens</div>
+                <div class="token-list">
+                  <div class="token-item">
+                    <div class="token-meta" style="display:flex;align-items:center;gap:10px;">
+                      <span class="token-dot dot-vdo">VDO</span>
+                      <div>
+                        <div class="token-symbol">VDO</div>
+                        <div class="token-fiat">$0.012</div>
+                      </div>
+                    </div>
+                    <div class="token-item-side">
+                      <div class="token-item-balances">
+                        <div class="token-balance">85,000.0000</div>
+                        <div class="token-fiat">$1,020.00</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="token-item">
+                    <div class="token-meta" style="display:flex;align-items:center;gap:10px;">
+                      <span class="token-dot dot-plsx">PLSX</span>
+                      <div>
+                        <div class="token-symbol">PLSX</div>
+                        <div class="token-fiat">$0.00004</div>
+                      </div>
+                    </div>
+                    <div class="token-item-side">
+                      <div class="token-item-balances">
+                        <div class="token-balance">2,100,000</div>
+                        <div class="token-fiat">$84.00</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="nav">
+            <div class="nav-row">
+              <button type="button" class="active">Home</button>
+              <button type="button">Swap</button>
+              <button type="button">Send</button>
+              <button type="button">Receive</button>
+            </div>
+            <div class="nav-row nav-row-secondary">
+              <button type="button">Stake</button>
+              <button type="button">Activity</button>
+              <button type="button">Accounts</button>
+              <button type="button">Settings</button>
+            </div>
+            <p class="nav-version">v1.0.6</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

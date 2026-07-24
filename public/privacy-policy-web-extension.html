@@ -67,6 +67,8 @@
     <tr><td>DexScreener (<code>api.dexscreener.com</code>)</td><td>None (public token price API)</td><td>VDO, MAGIC, POISON prices</td></tr>
     <tr><td>CoinGecko (<code>api.coingecko.com</code>)</td><td>None (public price API)</td><td>PLS price fallback</td></tr>
     <tr><td>Open Exchange Rates (<code>open.er-api.com</code>)</td><td>None (public forex API)</td><td>Display currency conversion</td></tr>
+    <tr><td>GeckoTerminal (<code>api.geckoterminal.com</code>)</td><td>None (public chart API)</td><td>Token price charts</td></tr>
+    <tr><td>LiveCoinWatch (<code>api.livecoinwatch.com</code>)</td><td>None (optional chart fallback; no key shipped in extension)</td><td>Token price charts when configured at build time</td></tr>
   </table>
   <p>These services have their own privacy policies and may log IP addresses.</p>
 
@@ -85,6 +87,8 @@
   <ul>
     <li><strong>storage</strong> — local wallet data and DApp permissions</li>
     <li><strong>tabs</strong> — route DApp provider messages to the correct browser tab</li>
+    <li><strong>notifications</strong> — alert you to incoming PLS or token transfers</li>
+    <li><strong>alarms</strong> — periodic background check for incoming transactions (every few minutes when enabled)</li>
     <li><strong>host permissions</strong> — blockchain RPC and price APIs listed above</li>
     <li><strong>content script (all URLs)</strong> — inject <code>window.ethereum</code> so PulseChain dApps can connect; no page content is read or modified beyond the provider</li>
   </ul>

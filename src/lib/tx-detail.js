@@ -3,6 +3,9 @@ import { getProvider } from './chain';
 import { DEFAULT_TOKENS, ERC20_ABI, PULSECHAIN } from '../config/pulsechain';
 
 const SCAN_API = PULSECHAIN.scanApi;
+const SCAN_TIMEOUT_MS = 3_000;
+const SCAN_ENRICH_BUDGET_MS = 2_000;
+const TX_DETAIL_CACHE_TTL_MS = 120_000;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7b7c163c06c28c29c94c9cec60';
 
 const knownTokens = Object.fromEntries(
@@ -10,20 +13,24 @@ const knownTokens = Object.fromEntries(
 );
 const contractNameCache = new Map();
 const tokenMetaCache = new Map();
+const txDetailCache = new Map();
 
+/** PulseScan is optional enrichment — never block RPC-backed detail on 500/timeout. */
 async function scanGet(module, action, params) {
   const qs = new URLSearchParams({ module, action, ...params });
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
     const res = await fetch(`${SCAN_API}?${qs}`, {
       signal: controller.signal,
       headers: { accept: 'application/json' },
     });
-    if (!res.ok) throw new Error(`PulseScan unavailable (${res.status})`);
+    if (!res.ok) return null;
     const json = await res.json();
     if (json?.status === '1') return json.result;
     if (json?.message === 'No transactions found') return null;
+    return null;
+  } catch {
     return null;
   } finally {
     clearTimeout(timeout);
@@ -152,27 +159,94 @@ function calcTxFee(gasUsed, gasPrice, effectiveGasPrice) {
   return formatEther(used * price);
 }
 
-export async function fetchTxDetail(hash) {
-  if (!hash) throw new Error('Missing transaction hash');
+async function resolveTimestamp(scanInfo, rpcReceipt, provider) {
+  const scanTs = Number(scanInfo?.timeStamp || 0) * 1000;
+  if (scanTs > 0) return scanTs;
+  if (rpcReceipt?.blockNumber == null) return 0;
+  try {
+    const block = await provider.getBlock(rpcReceipt.blockNumber);
+    return (block?.timestamp ?? 0) * 1000;
+  } catch {
+    return 0;
+  }
+}
 
-  const provider = getProvider();
-  const [scanInfo, internal, status, rpcTx, rpcReceipt] = await Promise.all([
+function delay(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+function startScanEnrichment(hash) {
+  return Promise.all([
     scanGet('transaction', 'gettxinfo', { txhash: hash }),
     scanGet('account', 'txlistinternal', { txhash: hash }),
     scanGet('transaction', 'getstatus', { txhash: hash }),
+  ]).then(([scanInfo, internal, status]) => ({ scanInfo, internal, status }));
+}
+
+async function awaitScanEnrichment(scanPromise, startedAt) {
+  const remaining = Math.max(0, SCAN_ENRICH_BUDGET_MS - (Date.now() - startedAt));
+  if (remaining === 0) return null;
+
+  return Promise.race([
+    scanPromise,
+    delay(remaining).then(() => null),
+  ]);
+}
+
+function cachedContractName(address) {
+  if (!address) return null;
+  return contractNameCache.get(address.toLowerCase()) ?? null;
+}
+
+function prefetchContractName(address) {
+  if (!address || cachedContractName(address)) return;
+  fetchContractName(address).catch(() => {});
+}
+
+export async function fetchTxDetail(hash) {
+  if (!hash) throw new Error('Missing transaction hash');
+
+  const cacheKey = hash.toLowerCase();
+  const cached = txDetailCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < TX_DETAIL_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const startedAt = Date.now();
+  const provider = getProvider();
+  const scanPromise = startScanEnrichment(hash);
+
+  const [rpcTx, rpcReceipt] = await Promise.all([
     provider.getTransaction(hash).catch(() => null),
     provider.getTransactionReceipt(hash).catch(() => null),
   ]);
 
-  if (!scanInfo && !rpcTx && !rpcReceipt) {
-    throw new Error('Transaction not found');
+  let scanInfo = null;
+  let internal = null;
+  let status = null;
+
+  if (rpcTx || rpcReceipt) {
+    const enrichment = await awaitScanEnrichment(scanPromise, startedAt);
+    if (enrichment) {
+      ({ scanInfo, internal, status } = enrichment);
+    }
+  } else {
+    const enrichment = await scanPromise;
+    ({ scanInfo, internal, status } = enrichment);
+    if (!scanInfo) throw new Error('Transaction not found');
   }
 
-  const logs = normalizeScanLogs(scanInfo).length
-    ? normalizeScanLogs(scanInfo)
-    : normalizeRpcLogs(rpcReceipt);
+  const scanLogs = normalizeScanLogs(scanInfo);
+  const logs = scanLogs.length ? scanLogs : normalizeRpcLogs(rpcReceipt);
 
-  const transfers = await enrichTransfers(parseTokenTransfers(logs));
+  const toAddress = scanInfo?.to || rpcTx?.to || '';
+  prefetchContractName(toAddress);
+
+  const [transfers, timestamp] = await Promise.all([
+    enrichTransfers(parseTokenTransfers(logs)),
+    resolveTimestamp(scanInfo, rpcReceipt, provider),
+  ]);
+  const contractName = cachedContractName(toAddress);
 
   const gasUsed = scanInfo?.gasUsed || rpcReceipt?.gasUsed?.toString() || '0';
   const gasLimit = scanInfo?.gasLimit || rpcTx?.gasLimit?.toString() || '0';
@@ -187,12 +261,7 @@ export async function fetchTxDetail(hash) {
     || (rpcReceipt?.blockNumber != null ? String(rpcReceipt.blockNumber) : '')
     || (rpcTx?.blockNumber != null ? String(rpcTx.blockNumber) : '');
 
-  const timestamp = Number(scanInfo?.timeStamp || 0) * 1000;
-
-  const toAddress = scanInfo?.to || rpcTx?.to || '';
-  const contractName = toAddress ? await fetchContractName(toAddress) : null;
-
-  return {
+  const result = {
     hash,
     status: success ? 'success' : 'failed',
     blockNumber,
@@ -200,7 +269,7 @@ export async function fetchTxDetail(hash) {
     timestamp,
     from: scanInfo?.from || rpcTx?.from || '',
     to: toAddress,
-    contractName,
+    contractName: contractName || null,
     value: formatEther(scanInfo?.value || rpcTx?.value || '0'),
     input: scanInfo?.input || rpcTx?.data || '0x',
     gasUsed,
@@ -218,6 +287,9 @@ export async function fetchTxDetail(hash) {
     transfers,
     logs,
   };
+
+  txDetailCache.set(cacheKey, { data: result, at: Date.now() });
+  return result;
 }
 
 export function formatTxDetailTime(timestamp) {

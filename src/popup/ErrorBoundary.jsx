@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { getMessages } from '../lib/i18n/index.js';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -13,13 +14,14 @@ export default class ErrorBoundary extends Component {
   render() {
     const { error } = this.state;
     if (error) {
+      const msgs = getMessages(document.documentElement.lang || 'en');
       return (
         <div className="app">
-          <div className="header"><h1>Voodoo Wallet</h1></div>
+          <div className="header"><h1>{msgs.app_name}</h1></div>
           <div className="content">
-            <p className="error">Something went wrong loading the wallet.</p>
+            <p className="error">{msgs.error_boundary_title}</p>
             <p className="muted" style={{ wordBreak: 'break-word' }}>{error.message}</p>
-            <p className="muted">Reload the extension at chrome://extensions and open dist, not the project root.</p>
+            <p className="muted">{msgs.error_boundary_hint}</p>
           </div>
         </div>
       );

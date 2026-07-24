@@ -26,7 +26,7 @@ function getRpc() {
 
 async function getState() {
   const { dappState = {} } = await chrome.storage.local.get('dappState');
-  return dappState;
+  return dappState || {};
 }
 
 async function setState(patch) {
@@ -37,13 +37,86 @@ async function setState(patch) {
   return next;
 }
 
-function respond(id, result, error = null, tabId = null) {
-  const payload = { type: 'VOODOO_DAPP_RESPONSE', id, result, error };
-  if (tabId) chrome.tabs.sendMessage(tabId, payload).catch(() => {});
+/** Per-request reply store so content scripts can poll by id */
+async function storeReply(id, result, error = null) {
+  if (!id) return;
+  const payload = {
+    type: 'VOODOO_DAPP_RESPONSE',
+    id,
+    result: result ?? null,
+    error: error ?? null,
+    ts: Date.now(),
+  };
+  try {
+    const { dappReplies = {} } = await chrome.storage.local.get('dappReplies');
+    const next = { ...dappReplies, [id]: payload };
+    // prune old replies (keep last ~40)
+    const keys = Object.keys(next);
+    if (keys.length > 40) {
+      keys
+        .sort((a, b) => (next[a].ts || 0) - (next[b].ts || 0))
+        .slice(0, keys.length - 40)
+        .forEach((k) => { delete next[k]; });
+    }
+    await chrome.storage.local.set({
+      dappReplies: next,
+      lastDappResponse: payload,
+    });
+  } catch (e) {
+    console.warn('[Voodoo] storeReply failed', e);
+  }
+  return payload;
+}
+
+export async function takeReply(id) {
+  if (!id) return null;
+  try {
+    const { dappReplies = {} } = await chrome.storage.local.get('dappReplies');
+    return dappReplies[id] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deliver reply to page via storage + tabs.
+ * Returns payload so caller can also put it on the runtime message response (most reliable).
+ */
+async function respond(id, result, error = null, tabId = null, origin = null) {
+  const payload = await storeReply(id, result, error);
+
+  const sendToTab = async (idTab) => {
+    if (idTab == null || !payload) return;
+    try {
+      await chrome.tabs.sendMessage(idTab, payload);
+    } catch {
+      /* no receiver */
+    }
+  };
+
+  await sendToTab(tabId);
+
+  try {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.map(async (tab) => {
+      if (!tab.id || !tab.url) return;
+      if (origin && !tab.url.startsWith(origin)) return;
+      if (!origin && !/^https?:\/\//i.test(tab.url)) return;
+      await sendToTab(tab.id);
+    }));
+  } catch {
+    /* ignore */
+  }
+
+  // Re-broadcast for late listeners
+  setTimeout(() => { storeReply(id, result, error); }, 300);
+  setTimeout(() => { storeReply(id, result, error); }, 1000);
+
+  return payload;
 }
 
 async function broadcastAccountsToTab(tabId, accounts) {
-  if (!tabId) return;
+  if (tabId == null) return;
   try {
     await chrome.tabs.sendMessage(tabId, {
       type: 'VOODOO_ACCOUNTS_BROADCAST',
@@ -82,10 +155,13 @@ export async function refreshActionBadge(state = null) {
   const current = state || await getState();
   const pending = current.pendingConnect || current.pendingSign;
   if (pending) {
-    const label = current.pendingConnect ? 'Approve connection' : 'Approve request';
     await chrome.action.setBadgeText({ text: '!' });
     await chrome.action.setBadgeBackgroundColor({ color: '#D73847' });
-    await chrome.action.setTitle({ title: `Voodoo Wallet — ${label} (open extension)` });
+    await chrome.action.setTitle({
+      title: current.pendingConnect
+        ? 'Voodoo Wallet — Unlock to connect site'
+        : 'Voodoo Wallet — Approve request',
+    });
   } else {
     await chrome.action.setBadgeText({ text: '' });
     await chrome.action.setTitle({ title: 'Voodoo Wallet' });
@@ -97,58 +173,80 @@ async function isOriginConnected(origin) {
   return (state.connections || {})[origin] === true;
 }
 
-async function queueUserApproval(type, payload) {
-  await setState({ [type]: { ...payload, createdAt: Date.now() } });
+async function tryOpenWalletPopup() {
   try {
-    await chrome.action.openPopup();
+    if (chrome.action?.openPopup) {
+      await chrome.action.openPopup();
+      return true;
+    }
   } catch {
-    /* popup may not open without user gesture — badge prompts user */
+    /* badge still prompts user */
   }
+  return false;
 }
 
+async function queueUserApproval(type, payload) {
+  await setState({ [type]: { ...payload, createdAt: Date.now() } });
+  await tryOpenWalletPopup();
+}
+
+/**
+ * Handle dApp RPC. Returns a value for chrome.runtime.sendMessage response:
+ * { immediate: true, payload } when finished now
+ * { pending: true } when waiting for unlock/approve
+ */
 export async function handleDappRequest(msg, tabId = null) {
   const { id, method, params = [], origin } = msg;
   const state = await getState();
   const activeAddress = state.activeAddress || null;
 
+  const done = async (result, error = null) => {
+    const payload = await respond(id, result, error, tabId, origin);
+    return { immediate: true, payload };
+  };
+
   try {
     if (requestsAccountPermission(method, params)) {
-      if (!activeAddress) {
-        respond(id, null, { code: 4100, message: 'Unlock Voodoo Wallet first' }, tabId);
-        return;
+      // Unlocked → connect immediately (site button click = consent)
+      if (activeAddress) {
+        const connections = { ...(state.connections || {}), [origin]: true };
+        await setState({ connections, pendingConnect: null });
+        await broadcastAccountsToTab(tabId, [activeAddress]);
+        await broadcastAccountsToOrigin(origin, [activeAddress]);
+        return done([activeAddress], null);
       }
+
+      // Locked → wait for unlock (auto-approve in setActiveAddress)
       await queueUserApproval('pendingConnect', {
-        id, origin, hostname: msg.hostname, tabId,
+        id,
+        origin,
+        hostname: msg.hostname,
+        tabId,
+        needsUnlock: true,
       });
-      return;
+      return { pending: true, needsUnlock: true };
     }
 
     switch (method) {
       case 'eth_chainId':
-        respond(id, PULSECHAIN_CHAIN_ID_HEX, null, tabId);
-        break;
+        return done(PULSECHAIN_CHAIN_ID_HEX, null);
 
       case 'net_version':
-        respond(id, String(PULSECHAIN_CHAIN_ID), null, tabId);
-        break;
+        return done(String(PULSECHAIN_CHAIN_ID), null);
 
       case 'eth_accounts': {
         const connected = await isOriginConnected(origin);
-        respond(id, connected && activeAddress ? [activeAddress] : [], null, tabId);
-        break;
+        return done(connected && activeAddress ? [activeAddress] : [], null);
       }
 
       case 'wallet_getPermissions': {
         const connected = await isOriginConnected(origin);
-        respond(
-          id,
+        return done(
           connected
             ? [{ parentCapability: 'eth_accounts', date: Date.now(), caveats: [] }]
             : [],
           null,
-          tabId,
         );
-        break;
       }
 
       case 'wallet_revokePermissions': {
@@ -157,92 +255,95 @@ export async function handleDappRequest(msg, tabId = null) {
           const connections = { ...(state.connections || {}) };
           delete connections[origin];
           await setState({ connections });
-          respond(id, null, null, tabId);
           await broadcastAccountsToOrigin(origin, []);
-        } else {
-          respond(id, null, null, tabId);
         }
-        break;
+        return done(null, null);
       }
 
       case 'eth_sign':
-        respond(id, null, {
+        return done(null, {
           code: -32601,
-          message: 'eth_sign is disabled for security. The site should use personal_sign.',
-        }, tabId);
-        break;
+          message: 'eth_sign is disabled for security. Use personal_sign.',
+        });
 
       case 'personal_sign':
       case 'eth_signTypedData':
       case 'eth_signTypedData_v4':
       case 'eth_sendTransaction': {
         if (!activeAddress) {
-          respond(id, null, { code: 4100, message: 'Wallet locked' }, tabId);
-          break;
+          return done(null, { code: 4100, message: 'Wallet locked' });
         }
         if (!(await isOriginConnected(origin))) {
-          respond(id, null, { code: 4100, message: 'Connect to this site first' }, tabId);
-          break;
+          return done(null, { code: 4100, message: 'Connect to this site first' });
         }
         await queueUserApproval('pendingSign', {
           id, method, params, origin, hostname: msg.hostname, tabId,
         });
-        break;
+        return { pending: true };
       }
 
       default: {
         if (method === 'wallet_switchEthereumChain') {
           const chain = params[0]?.chainId;
           if (isUnsupportedChainSwitch(chain)) {
-            respond(id, null, { code: 4902, message: 'Only PulseChain (369) supported' }, tabId);
-            break;
+            return done(null, { code: 4902, message: 'Only PulseChain (369) supported' });
           }
-          respond(id, null, null, tabId);
-          break;
+          return done(null, null);
         }
 
         if (isReadOnlyRpcMethod(method)) {
           const result = await getRpc().send(method, params);
-          respond(id, result, null, tabId);
-          break;
+          return done(result, null);
         }
 
-        if (method?.startsWith('eth_')) {
-          respond(id, null, {
-            code: -32601,
-            message: `Method ${method} is not supported or requires wallet approval`,
-          }, tabId);
-          break;
-        }
-
-        respond(id, null, { code: -32601, message: `Method ${method} not supported` }, tabId);
+        return done(null, {
+          code: -32601,
+          message: `Method ${method} not supported`,
+        });
       }
     }
   } catch (err) {
-    respond(id, null, { code: -32603, message: err.message || 'Internal error' }, tabId);
+    return done(null, { code: -32603, message: err.message || 'Internal error' });
   }
 }
 
-export async function approveConnect(origin) {
+export async function approveConnect(origin, addressOverride = null) {
   const state = await getState();
-  const connections = { ...(state.connections || {}), [origin]: true };
-  const { id: requestId, tabId } = state.pendingConnect || {};
+  const pending = state.pendingConnect || {};
+  const requestId = pending.id;
+  const tabId = pending.tabId ?? null;
+  const targetOrigin = origin || pending.origin;
+  const address = addressOverride || state.activeAddress || null;
+
+  if (!address) {
+    return { ok: false, error: 'Wallet locked — unlock first' };
+  }
+
+  const connections = { ...(state.connections || {}) };
+  if (targetOrigin) connections[targetOrigin] = true;
+
   await setState({ connections, pendingConnect: null });
-  const accounts = state.activeAddress ? [state.activeAddress] : [];
+  const accounts = [address];
+
   if (requestId) {
-    respond(requestId, accounts, null, tabId);
+    await respond(requestId, accounts, null, tabId, targetOrigin);
   }
   await broadcastAccountsToTab(tabId, accounts);
+  if (targetOrigin) {
+    await broadcastAccountsToOrigin(targetOrigin, accounts);
+  }
+  return { ok: true, accounts };
 }
 
 export async function rejectConnect() {
   const state = await getState();
   if (state.pendingConnect?.id) {
-    respond(
+    await respond(
       state.pendingConnect.id,
       null,
       { code: 4001, message: 'User rejected connection' },
       state.pendingConnect.tabId,
+      state.pendingConnect.origin,
     );
   }
   await setState({ pendingConnect: null });
@@ -251,7 +352,13 @@ export async function rejectConnect() {
 export async function approveSign(result) {
   const state = await getState();
   if (state.pendingSign?.id) {
-    respond(state.pendingSign.id, result, null, state.pendingSign.tabId);
+    await respond(
+      state.pendingSign.id,
+      result,
+      null,
+      state.pendingSign.tabId,
+      state.pendingSign.origin,
+    );
   }
   await setState({ pendingSign: null });
 }
@@ -259,11 +366,12 @@ export async function approveSign(result) {
 export async function rejectSign() {
   const state = await getState();
   if (state.pendingSign?.id) {
-    respond(
+    await respond(
       state.pendingSign.id,
       null,
       { code: 4001, message: 'User rejected request' },
       state.pendingSign.tabId,
+      state.pendingSign.origin,
     );
   }
   await setState({ pendingSign: null });
@@ -272,6 +380,15 @@ export async function rejectSign() {
 export async function setActiveAddress(address) {
   const state = await setState({ activeAddress: address || null });
   await broadcastAccountsForConnections();
+
+  if (address && state.pendingConnect?.id) {
+    try {
+      await approveConnect(state.pendingConnect.origin, address);
+    } catch (e) {
+      console.warn('Auto-approve pending connect failed', e);
+    }
+  }
+
   return state;
 }
 
@@ -280,6 +397,7 @@ export async function getPendingDapp() {
   return {
     connect: state.pendingConnect || null,
     sign: state.pendingSign || null,
+    activeAddress: state.activeAddress || null,
   };
 }
 
@@ -296,4 +414,14 @@ export async function disconnectOrigin(origin) {
   delete connections[origin];
   await setState({ connections });
   await broadcastAccountsToOrigin(origin, []);
+}
+
+/** Diagnostics for debugging connect from content script / page */
+export async function getDappDebug() {
+  const state = await getState();
+  return {
+    activeAddress: state.activeAddress || null,
+    pendingConnect: state.pendingConnect || null,
+    connections: state.connections || {},
+  };
 }

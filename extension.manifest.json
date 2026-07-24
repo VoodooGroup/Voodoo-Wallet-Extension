@@ -4,14 +4,16 @@
   "short_name": "Voodoo Wallet",
   "version": "1.0.6",
   "description": "Voodoo Wallet — PulseChain wallet with VDO staking",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "notifications", "alarms"],
   "host_permissions": [
     "https://rpc.pulsechain.com/*",
-    "https://scan.pulsechain.com/*",
+    "https://pulsechain.publicnode.com/*",
     "https://api.scan.pulsechain.com/*",
     "https://otter.pulsechain.com/*",
     "https://api.coingecko.com/*",
     "https://api.dexscreener.com/*",
+    "https://api.geckoterminal.com/*",
+    "https://api.livecoinwatch.com/*",
     "https://open.er-api.com/*"
   ],
   "options_ui": {

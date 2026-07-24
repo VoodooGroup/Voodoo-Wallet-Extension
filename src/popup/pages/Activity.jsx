@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
+import { useI18n } from '../../context/I18nContext.jsx';
 import { shortenAddress } from '../../lib/wallet';
 import {
-  explorerAddressUrl, fetchWalletActivity, formatTxTime,
+  clearActivityCache,
+  fetchActivityFast,
+  fetchActivityFull,
+  fetchWalletActivity,
+  formatTxTime,
+  peekActivityCache,
 } from '../../lib/transactions';
 import TxDetail from './TxDetail';
 
 export default function Activity() {
+  const { t } = useI18n();
   const { address } = useWallet();
   const [items, setItems] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
@@ -14,44 +21,159 @@ export default function Activity() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
-  const [source, setSource] = useState('');
   const [selectedHash, setSelectedHash] = useState(null);
+  const sourceRef = useRef('auto');
+  const requestIdRef = useRef(0);
+  const loadedOnceRef = useRef(false);
 
-  const load = useCallback(async (cursor = null, append = false, mode = source || 'scan') => {
-    if (!address) return;
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    setError('');
+  const applyActivityData = useCallback((data, append = false) => {
+    setItems((prev) => {
+      if (!append) return data.items;
+      const seen = new Set(prev.map((tx) => tx.id));
+      const next = data.items.filter((tx) => !seen.has(tx.id));
+      return [...prev, ...next];
+    });
+    setHasMore(data.hasMore);
+    setNextCursor(data.nextCursor);
+    sourceRef.current = data.source || sourceRef.current;
+  }, []);
+
+  const loadFull = useCallback(async (requestId, options = {}) => {
+    const { silent = true } = options;
     try {
-      const data = await fetchWalletActivity(address, cursor, append ? mode : 'scan');
-      setItems((prev) => {
-        if (!append) return data.items;
-        const seen = new Set(prev.map((tx) => tx.id));
-        const next = data.items.filter((tx) => !seen.has(tx.id));
-        return [...prev, ...next];
-      });
-      setHasMore(data.hasMore);
-      setNextCursor(data.nextCursor);
-      setSource(data.source || 'scan');
+      const data = await fetchActivityFull(address);
+      if (requestId !== requestIdRef.current) return;
+      applyActivityData(data, false);
+      loadedOnceRef.current = true;
+      setError('');
     } catch (e) {
-      setError(e.message || 'Could not load transaction history');
-      if (!append) setItems([]);
+      if (requestId !== requestIdRef.current) return;
+      if (!silent) {
+        setError(e.message || t('activity_load_error'));
+        setItems([]);
+      }
+    }
+  }, [address, applyActivityData, t]);
+
+  const load = useCallback(async (cursor = null, append = false, mode = null, options = {}) => {
+    if (!address) {
+      setLoading(false);
+      setLoadingMore(false);
+      setItems([]);
+      return;
+    }
+
+    const { silent = false, bypassCache = false } = options;
+    const fetchMode = mode || (append ? sourceRef.current : 'auto');
+    const requestId = ++requestIdRef.current;
+
+    if (append) setLoadingMore(true);
+    else if (!silent && !loadedOnceRef.current) setLoading(true);
+    setError('');
+
+    try {
+      if (!cursor && bypassCache) {
+        clearActivityCache(address);
+      }
+
+      if (!cursor && !append && bypassCache) {
+        const fast = await fetchActivityFast(address);
+        if (requestId !== requestIdRef.current) return;
+        applyActivityData(fast, false);
+        if (fast.items.length > 0) {
+          loadedOnceRef.current = true;
+          setLoading(false);
+        }
+        await loadFull(requestId, { silent: false });
+        return;
+      }
+
+      const data = await fetchWalletActivity(address, cursor, fetchMode, { bypassCache });
+      if (requestId !== requestIdRef.current) return;
+
+      applyActivityData(data, append);
+      loadedOnceRef.current = true;
+    } catch (e) {
+      if (requestId !== requestIdRef.current) return;
+      if (!silent) {
+        setError(e.message || t('activity_load_error'));
+        if (!append) setItems([]);
+      }
     } finally {
+      if (requestId !== requestIdRef.current) return;
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [address, source]);
+  }, [address, applyActivityData, loadFull, t]);
 
   useEffect(() => {
-    load(null, false);
-  }, [load]);
+    if (!address) {
+      setLoading(false);
+      setItems([]);
+      loadedOnceRef.current = false;
+      return undefined;
+    }
+
+    loadedOnceRef.current = false;
+    setError('');
+    sourceRef.current = 'auto';
+
+    const requestId = ++requestIdRef.current;
+    const cached = peekActivityCache(address);
+
+    if (cached?.items?.length && cached.tokenEnriched) {
+      applyActivityData(cached, false);
+      loadedOnceRef.current = true;
+      setLoading(false);
+      loadFull(requestId, { silent: true });
+      return () => {
+        requestIdRef.current += 1;
+      };
+    }
+
+    if (cached?.items?.length) {
+      applyActivityData(cached, false);
+      loadedOnceRef.current = true;
+      setLoading(false);
+      loadFull(requestId, { silent: false });
+      return () => {
+        requestIdRef.current += 1;
+      };
+    }
+
+    (async () => {
+      try {
+        const fast = await fetchActivityFast(address);
+        if (requestId !== requestIdRef.current) return;
+
+        if (fast.items.length > 0) {
+          applyActivityData(fast, false);
+          loadedOnceRef.current = true;
+          setLoading(false);
+        }
+
+        await loadFull(requestId, { silent: fast.items.length === 0 });
+      } catch (e) {
+        if (requestId !== requestIdRef.current) return;
+        setError(e.message || t('activity_load_error'));
+        setItems([]);
+      } finally {
+        if (requestId !== requestIdRef.current) return;
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [address]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (selectedHash) {
     return <TxDetail hash={selectedHash} onBack={() => setSelectedHash(null)} />;
   }
 
   if (loading) {
-    return <div className="card muted">Loading transaction history…</div>;
+    return <div className="card muted">{t('activity_loading')}</div>;
   }
 
   return (
@@ -59,19 +181,16 @@ export default function Activity() {
       <div className="card">
         <div className="row">
           <div>
-            <div className="label">Transaction history</div>
-            <div className="muted">
-              {shortenAddress(address, 8)}
-              {source && ` · via ${source === 'rpc' ? 'RPC' : 'PulseScan'}`}
-            </div>
+            <div className="label">{t('activity_title')}</div>
+            <div className="muted">{shortenAddress(address, 8)}</div>
           </div>
           <button
             type="button"
             className="btn btn-secondary"
             style={{ width: 'auto' }}
-            onClick={() => load(null, false)}
+            onClick={() => load(null, false, 'auto', { bypassCache: true })}
           >
-            Refresh
+            {t('refresh')}
           </button>
         </div>
       </div>
@@ -79,23 +198,18 @@ export default function Activity() {
       {error && (
         <div className="card">
           <p className="error">{error}</p>
-          <a
-            className="activity-link"
-            href={explorerAddressUrl(address)}
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginTop: 8 }}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => load(null, false, 'auto', { bypassCache: true })}
           >
-            Open wallet on Otterscan
-          </a>
-          <button type="button" className="btn btn-secondary" onClick={() => load(null, false)}>
-            Retry
+            {t('retry')}
           </button>
         </div>
       )}
 
       {!error && items.length === 0 && (
-        <div className="card muted">No transactions yet for this wallet.</div>
+        <div className="card muted">{t('no_transactions')}</div>
       )}
 
       <div className="activity-list">
@@ -109,7 +223,7 @@ export default function Activity() {
             <div className="row">
               <div>
                 <div className="activity-title">
-                  {tx.direction === 'sent' ? 'Sent' : 'Received'} {tx.symbol}
+                  {tx.direction === 'sent' ? t('tx_sent') : t('tx_received')} {tx.symbol}
                 </div>
                 <div className="muted">{formatTxTime(tx.timestamp)}</div>
               </div>
@@ -120,15 +234,14 @@ export default function Activity() {
                   {' '}
                   {tx.symbol}
                 </div>
-                {tx.status === 'failed' && <div className="error">Failed</div>}
+                {tx.status === 'failed' && <div className="error">{t('tx_failed')}</div>}
               </div>
             </div>
             <div className="activity-meta muted">
-              {tx.direction === 'sent' ? 'To' : 'From'}
+              {tx.direction === 'sent' ? t('to') : t('tx_from')}
               {' '}
-              {shortenAddress(tx.counterparty, 4)}
+              {tx.counterparty}
             </div>
-            <span className="activity-link">View details</span>
           </button>
         ))}
       </div>
@@ -140,7 +253,7 @@ export default function Activity() {
           disabled={loadingMore}
           onClick={() => load(nextCursor, true)}
         >
-          {loadingMore ? 'Loading…' : 'Load more'}
+          {loadingMore ? t('loading') : t('load_more')}
         </button>
       )}
     </>

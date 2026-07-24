@@ -1,9 +1,8 @@
-SELECT THIS FOLDER in Chrome -> Load unpacked
+SELECT THIS dist/ FOLDER in Chrome → Load unpacked
 
-Path: C:\Users\ReMarkt\voodoo-pulse-extension\dist
-
-You can also load the parent folder after "npm run build".
-If you see a main.jsx MIME error, you are not running the built extension.
-Run "npm run build", then load the "dist" folder (or this parent folder) in chrome://extensions.
+Alternative to loading the project root.
+1. chrome://extensions
+2. Developer mode ON
+3. Load unpacked → select THIS dist folder
 
 Version: 1.0.6

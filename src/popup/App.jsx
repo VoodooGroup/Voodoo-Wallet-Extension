@@ -1,51 +1,57 @@
 import {
-  lazy, Suspense, useCallback, useEffect, useRef, useState,
+  lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState,
 } from 'react';
+import { I18nProvider, useI18n } from '../context/I18nContext.jsx';
 import { WalletProvider, useWallet } from '../context/WalletContext';
 import ErrorBoundary from './ErrorBoundary';
 import Onboarding from './pages/Onboarding';
 import Unlock from './pages/Unlock';
 import HeaderMenu from './components/HeaderMenu';
-import { assetUrl, pulsechainLogoUrl } from '../lib/assets';
+import MenuInsightsPanel from './components/MenuInsightsPanel';
+import { appBrandLogoUrl, pulsechainLogoUrl } from '../lib/assets';
 import { applyTheme } from '../lib/theme';
 import { getAutoLockMs } from '../lib/auto-lock';
 import { getSession, touchSession } from '../lib/session';
 import { getAppVersion } from '../lib/version';
+import { TabNavProvider } from '../context/TabNavContext.jsx';
 
 const Home = lazy(() => import('./pages/Home'));
+const Swap = lazy(() => import('./pages/Swap'));
 const Send = lazy(() => import('./pages/Send'));
 const Receive = lazy(() => import('./pages/Receive'));
 const Stake = lazy(() => import('./pages/Stake'));
 const Accounts = lazy(() => import('./pages/Accounts'));
 const Activity = lazy(() => import('./pages/Activity'));
 const Settings = lazy(() => import('./pages/Settings'));
+const ImportWallet = lazy(() => import('./pages/ImportWallet'));
 const DappPrompt = lazy(() => import('./components/DappPrompt'));
 
 function BootShell() {
+  const { t } = useI18n();
   return (
     <div className="app app-boot">
       <div className="header">
         <div className="header-inner">
           <div className="header-brand">
             <img
-              src={assetUrl('voodoo-wallet.png')}
-              alt="Voodoo Wallet"
+              src={appBrandLogoUrl()}
+              alt={t('app_name')}
               className="header-brand-logo"
               width={52}
               height={52}
             />
             <div>
-              <h1>Voodoo Wallet</h1>
+              <h1>{t('app_name')}</h1>
               <p className="header-network">
                 <img
                   src={pulsechainLogoUrl()}
-                  alt="PulseChain"
+                  alt={t('pulsechain')}
                   className="header-network-logo"
                   width={20}
                   height={20}
                   draggable={false}
                 />
-                PulseChain
+                {t('pulsechain')}
               </p>
             </div>
           </div>
@@ -56,11 +62,17 @@ function BootShell() {
 }
 
 function Shell() {
+  const { t } = useI18n();
   const {
     loading, unlocked, hasWallet, theme, lock,
   } = useWallet();
   const [tab, setTab] = useState('home');
+  const [importOpen, setImportOpen] = useState(false);
+  const [insightsView, setInsightsView] = useState(null);
   const lastActivity = useRef(Date.now());
+  const shellRef = useRef(null);
+  const headerRef = useRef(null);
+  const navRef = useRef(null);
 
   const bumpActivity = useCallback(() => {
     if (!unlocked) return;
@@ -68,9 +80,42 @@ function Shell() {
     touchSession();
   }, [unlocked]);
 
+  /** Measure chrome so modals center between header and bottom nav (no grey over nav). */
+  useLayoutEffect(() => {
+    if (!unlocked) return undefined;
+    const applyChromeMetrics = () => {
+      const headerH = headerRef.current?.offsetHeight ?? 81;
+      const navH = navRef.current?.offsetHeight ?? 132;
+      const root = document.documentElement;
+      root.style.setProperty('--app-header-h', `${headerH}px`);
+      root.style.setProperty('--app-nav-h', `${navH}px`);
+      if (shellRef.current) {
+        shellRef.current.style.setProperty('--app-header-h', `${headerH}px`);
+        shellRef.current.style.setProperty('--app-nav-h', `${navH}px`);
+      }
+    };
+    applyChromeMetrics();
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(applyChromeMetrics)
+      : null;
+    if (headerRef.current) ro?.observe(headerRef.current);
+    if (navRef.current) ro?.observe(navRef.current);
+    window.addEventListener('resize', applyChromeMetrics);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', applyChromeMetrics);
+    };
+  }, [unlocked, tab, insightsView]);
+
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    import('./pages/Stake');
+    import('./pages/Swap');
+  }, [unlocked]);
 
   useEffect(() => {
     if (!unlocked) return undefined;
@@ -92,15 +137,17 @@ function Shell() {
   if (!hasWallet) return <Onboarding />;
   if (!unlocked) return <Unlock />;
 
-  const pages = {
-    home: <Home />,
-    send: <Send />,
-    receive: <Receive />,
-    stake: <Stake />,
-    activity: <Activity />,
-    accounts: <Accounts />,
-    settings: <Settings />,
+  const tabPanels = {
+    home: Home,
+    swap: Swap,
+    send: Send,
+    receive: Receive,
+    stake: Stake,
+    activity: Activity,
+    accounts: Accounts,
+    settings: Settings,
   };
+  const ActivePage = tabPanels[tab] || Home;
 
   const setTabActive = (id) => {
     bumpActivity();
@@ -108,79 +155,126 @@ function Shell() {
   };
 
   return (
-    <div className="app app-shell">
+    <TabNavProvider navigate={setTabActive}>
+    <div className="app app-shell" ref={shellRef}>
       <Suspense fallback={null}>
         <DappPrompt />
       </Suspense>
-      <div className="header">
+      <div className="header" ref={headerRef}>
         <div className="header-inner">
           <div className="header-brand">
             <img
-              src={assetUrl('voodoo-wallet.png')}
-              alt="Voodoo Wallet"
+              src={appBrandLogoUrl()}
+              alt={t('app_name')}
               className="header-brand-logo"
               width={52}
               height={52}
             />
             <div>
-              <h1>Voodoo Wallet</h1>
+              <h1>{t('app_name')}</h1>
               <p className="header-network">
                 <img
                   src={pulsechainLogoUrl()}
-                  alt="PulseChain"
+                  alt={t('pulsechain')}
                   className="header-network-logo"
                   width={20}
                   height={20}
                   draggable={false}
                 />
-                PulseChain
+                {t('pulsechain')}
               </p>
             </div>
           </div>
-          <HeaderMenu />
+          <HeaderMenu
+            onImportWallet={() => setImportOpen(true)}
+            onOpenInsights={(view) => setInsightsView(view)}
+          />
         </div>
       </div>
+      {importOpen && (
+        <Suspense fallback={null}>
+          <ImportWallet onClose={() => setImportOpen(false)} />
+        </Suspense>
+      )}
+      {insightsView && (
+        <MenuInsightsPanel
+          view={insightsView}
+          onClose={() => setInsightsView(null)}
+          onGoStake={() => {
+            setInsightsView(null);
+            setTabActive('stake');
+          }}
+        />
+      )}
       <div className="app-scroll" onClick={bumpActivity} onKeyDown={bumpActivity} role="presentation">
         <Suspense fallback={<BootShell />}>
-          <div className="content">{pages[tab]}</div>
+          <div
+            className={[
+              'content',
+              tab === 'swap' ? 'content-swap' : '',
+              tab === 'receive' ? 'content-receive' : '',
+            ].filter(Boolean).join(' ')}
+          >
+            <ActivePage />
+          </div>
         </Suspense>
       </div>
-      <div className="nav">
+      <div className="nav" ref={navRef}>
         <div className="nav-row">
           {[
-            ['home', 'Home'],
-            ['send', 'Send'],
-            ['receive', 'Receive'],
-            ['stake', 'Stake'],
-          ].map(([id, label]) => (
-            <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTabActive(id)}>
-              {label}
+            ['home', 'nav_home'],
+            ['swap', 'nav_swap'],
+            ['send', 'nav_send'],
+            ['receive', 'nav_receive'],
+          ].map(([id, labelKey]) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? 'active' : ''}
+              aria-current={tab === id ? 'page' : undefined}
+              onMouseEnter={id === 'swap' ? () => import('./pages/Swap') : undefined}
+              onFocus={id === 'swap' ? () => import('./pages/Swap') : undefined}
+              onClick={() => setTabActive(id)}
+            >
+              {t(labelKey)}
             </button>
           ))}
         </div>
         <div className="nav-row nav-row-secondary">
           {[
-            ['activity', 'Activity'],
-            ['accounts', 'Accounts'],
-            ['settings', 'Settings'],
-          ].map(([id, label]) => (
-            <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTabActive(id)}>
-              {label}
+            ['stake', 'nav_stake'],
+            ['activity', 'nav_activity'],
+            ['accounts', 'nav_accounts'],
+            ['settings', 'nav_settings'],
+          ].map(([id, labelKey]) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? 'active' : ''}
+              aria-current={tab === id ? 'page' : undefined}
+              onMouseEnter={id === 'stake' ? () => import('./pages/Stake') : undefined}
+              onFocus={id === 'stake' ? () => import('./pages/Stake') : undefined}
+              onClick={() => setTabActive(id)}
+            >
+              {t(labelKey)}
             </button>
           ))}
         </div>
-        <p className="nav-version">V{getAppVersion()}</p>
+        <p className="nav-version">{t('version', { version: getAppVersion() })}</p>
       </div>
     </div>
+    </TabNavProvider>
   );
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <WalletProvider>
-        <Shell />
-      </WalletProvider>
+      <I18nProvider>
+        <WalletProvider>
+          <Shell />
+        </WalletProvider>
+      </I18nProvider>
     </ErrorBoundary>
   );
 }

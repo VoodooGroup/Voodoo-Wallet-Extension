@@ -9,8 +9,21 @@ export const DEFAULT_THEME = {
   border: '#e5e7eb',
 };
 
-export function applyTheme(theme = DEFAULT_THEME) {
+/** Temporary grey default — migrate saved wallets back to blue. */
+const GREY_ACCENT = '#4e575d';
+const GREY_ACCENT_SOFT = '#e8eaeb';
+
+export function normalizeTheme(theme = {}) {
   const t = { ...DEFAULT_THEME, ...theme };
+  const accent = String(t.accent || '').toLowerCase();
+  const soft = String(t.accentSoft || '').toLowerCase();
+  if (accent === GREY_ACCENT) t.accent = DEFAULT_THEME.accent;
+  if (soft === GREY_ACCENT_SOFT) t.accentSoft = DEFAULT_THEME.accentSoft;
+  return t;
+}
+
+export function applyTheme(theme = DEFAULT_THEME) {
+  const t = normalizeTheme(theme);
   const root = document.documentElement;
   root.style.setProperty('--bg', t.bg);
   root.style.setProperty('--panel', t.panel);

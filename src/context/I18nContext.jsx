@@ -52,7 +52,7 @@ export function I18nProvider({ children }) {
   const value = useMemo(() => ({ locale, setLocale, t, ready }), [locale, setLocale, t, ready]);
 
   if (!ready) {
-    return <div className="app"><div className="content muted">Loading…</div></div>;
+    return <div className="app"><div className="content muted">{translate(DEFAULT_LOCALE, 'loading')}</div></div>;
   }
 
   return (

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voodoo Wallet — Connect Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 16px; background: #0a2f3c; color: #fff; }
+    button { font-size: 16px; padding: 12px 18px; margin: 8px 8px 8px 0; cursor: pointer; border-radius: 8px; border: 0; }
+    #log { white-space: pre-wrap; background: #111; color: #9f9; padding: 14px; border-radius: 8px; min-height: 200px; font: 13px/1.4 ui-monospace, monospace; }
+    .err { color: #f88; }
+    h1 { font-size: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Voodoo Wallet connect test</h1>
+  <p>Open deze pagina via de extensie of host hem op http://localhost. Zorg dat Voodoo Wallet geladen is.</p>
+  <button id="check" type="button">1. Check inject</button>
+  <button id="chain" type="button">2. eth_chainId</button>
+  <button id="connect" type="button" style="background:#0d9488;color:#fff">3. Connect (eth_requestAccounts)</button>
+  <button id="debug" type="button">4. Extension debug</button>
+  <pre id="log">Klaar…</pre>
+  <script>
+    const logEl = document.getElementById('log');
+    function log(msg, isErr) {
+      const line = (typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2));
+      logEl.textContent += '\n' + line;
+      if (isErr) logEl.classList.add('err');
+      console.log(msg);
+    }
+    function provider() {
+      return window.voodooEthereum || window.VoodooWalletProvider
+        || (window.ethereum?.isVoodooWallet ? window.ethereum : null);
+    }
+    document.getElementById('check').onclick = () => {
+      logEl.textContent = '';
+      log('bridgeReady=' + !!window.__VOODOO_BRIDGE_READY__);
+      log('voodooEthereum=' + !!window.voodooEthereum);
+      log('ethereum.isVoodooWallet=' + !!window.ethereum?.isVoodooWallet);
+      log('ethereum.isMetaMask=' + !!window.ethereum?.isMetaMask);
+      log('providers=' + (window.ethereum?.providers?.length || 0));
+    };
+    document.getElementById('chain').onclick = async () => {
+      try {
+        const p = provider();
+        if (!p) throw new Error('Geen Voodoo provider — inject faalt');
+        const id = await p.request({ method: 'eth_chainId' });
+        log('eth_chainId => ' + id);
+      } catch (e) {
+        log('FOUT chainId: ' + (e.message || e), true);
+      }
+    };
+    document.getElementById('connect').onclick = async () => {
+      try {
+        const p = provider();
+        if (!p) throw new Error('Geen Voodoo provider');
+        log('request eth_requestAccounts… (unlock wallet indien nodig)');
+        const accounts = await p.request({ method: 'eth_requestAccounts' });
+        log('SUCCESS accounts => ' + JSON.stringify(accounts));
+      } catch (e) {
+        log('FOUT connect: ' + (e.message || e) + ' code=' + e.code, true);
+      }
+    };
+    document.getElementById('debug').onclick = () => {
+      log('asking extension debug…');
+      const handler = (ev) => {
+        if (ev.source !== window || ev.data?.target !== 'voodoo-inpage') return;
+        if (ev.data.type !== 'VOODOO_DEBUG_RESULT') return;
+        window.removeEventListener('message', handler);
+        log(ev.data.debug);
+      };
+      window.addEventListener('message', handler);
+      window.postMessage({ target: 'voodoo-contentscript', type: 'VOODOO_DEBUG' }, '*');
+    };
+  </script>
+</body>
+</html>

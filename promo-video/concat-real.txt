@@ -1,0 +1,4 @@
+file 'C:/Users/ReMarkt/voodoo-pulse-extension/promo-video/clip01.mp4'
+file 'C:/Users/ReMarkt/voodoo-pulse-extension/promo-video/clip02.mp4'
+file 'C:/Users/ReMarkt/voodoo-pulse-extension/promo-video/clip03.mp4'
+file 'C:/Users/ReMarkt/voodoo-pulse-extension/promo-video/clip04.mp4'

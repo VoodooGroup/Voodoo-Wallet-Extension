@@ -29,7 +29,7 @@ export async function deriveAccountFromMnemonic(mnemonic, accountIndex = 0) {
 
 export function walletFromPrivateKey(privateKey) {
   const key = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-  if (!isHexString(key, 32)) throw new Error('Invalid private key');
+  if (!isHexString(key, 32)) throw new Error('error_invalid_private_key');
   return new Wallet(key, getProvider());
 }
 

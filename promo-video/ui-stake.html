@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Voodoo Wallet — Stake</title>
+<link rel="stylesheet" href="../dist/assets/index-BL1ukM1j.css" />
+<link rel="stylesheet" href="real-ui-shell.css" />
+<style>
+  html, body {
+    width: 1920px !important; max-width: none !important; min-width: 0 !important;
+    height: 1080px !important; max-height: none !important; min-height: 0 !important;
+    overflow: hidden !important; background: #061820 !important;
+  }
+  .phone-inner {
+    --wallpaper-fallback: #0a2f3a;
+    --wallpaper-image: url("../dist/public/voodoo-token-background.png");
+  }
+  .phone-inner .app-shell { background-size: cover; background-position: center; }
+  .phone-inner .app-scroll {
+    background-size: cover; background-position: center; overflow: hidden; flex: 1;
+  }
+  .phone-inner input {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    margin-bottom: 10px; font-size: 13px; background: #fff;
+  }
+  .phone-inner .label { font-size: 12px; font-weight: 600; margin: 8px 0 6px; color: var(--muted); }
+  .phone-inner .btn {
+    width: 100%; border: none; border-radius: 10px; padding: 12px; font-weight: 600; cursor: pointer;
+  }
+  .pool-chip {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 8px;
+    border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="copy">
+      <div class="kicker">VDO staking</div>
+      <h1>Stake VDO inside the wallet</h1>
+      <p>Approve, stake, and track pools for MAGIC or POISON rewards — no extra app.</p>
+      <div class="brand">
+        <img src="../dist/public/voodoo-wallet-logo.jpg" alt="" />
+        <span>Real product UI · PulseChain only</span>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="phone-inner">
+        <div class="app app-shell" style="display:flex;flex-direction:column;height:560px;">
+          <div class="header">
+            <div class="header-inner">
+              <div class="header-brand">
+                <img src="../dist/public/voodoo-wallet-logo.jpg" alt="Voodoo Wallet" class="header-brand-logo" width="52" height="52" style="border-radius:12px;object-fit:cover;" />
+                <div>
+                  <h1 style="font-size:16px;margin:0;">Voodoo Wallet</h1>
+                  <p class="header-network" style="display:flex;align-items:center;gap:6px;margin:2px 0 0;font-size:12px;color:var(--muted);">
+                    <img src="../dist/public/pulsechain-logo-40.png" alt="" width="16" height="16" />
+                    PulseChain
+                  </p>
+                </div>
+              </div>
+              <button type="button" class="header-menu-btn" aria-label="Menu">
+                <span class="header-menu-line"></span>
+                <span class="header-menu-line"></span>
+                <span class="header-menu-line"></span>
+              </button>
+            </div>
+          </div>
+          <div class="app-scroll" style="flex:1;overflow:hidden;">
+            <div class="content">
+              <div class="card">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                  <span class="token-dot dot-vdo">VDO</span>
+                  <div>
+                    <div class="token-symbol" style="font-weight:700;">Stake VDO</div>
+                    <div class="muted">Available: 85,000 VDO</div>
+                  </div>
+                </div>
+                <div style="margin-bottom:10px;">
+                  <span class="pool-chip">MAGIC · 30 days</span>
+                  <span class="pool-chip">MAGIC · 60 days</span>
+                </div>
+                <div class="label">Amount</div>
+                <input value="1000" readonly />
+                <button type="button" class="btn btn-primary" style="margin-bottom:8px;">Stake</button>
+                <p class="muted" style="margin:0;">Built-in pools — stay in Chrome.</p>
+              </div>
+              <div class="card">
+                <div class="label">Your stakes</div>
+                <div class="token-item">
+                  <div>
+                    <div class="token-symbol">1,000 VDO · MAGIC</div>
+                    <div class="muted">Unlock in 28d 4h</div>
+                  </div>
+                  <span class="token-balance" style="font-size:12px;color:var(--accent);">Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="nav">
+            <div class="nav-row">
+              <button type="button">Home</button>
+              <button type="button">Swap</button>
+              <button type="button">Send</button>
+              <button type="button">Receive</button>
+            </div>
+            <div class="nav-row nav-row-secondary">
+              <button type="button" class="active">Stake</button>
+              <button type="button">Activity</button>
+              <button type="button">Accounts</button>
+              <button type="button">Settings</button>
+            </div>
+            <p class="nav-version">v1.0.6</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

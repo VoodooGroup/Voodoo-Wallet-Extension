@@ -2,21 +2,22 @@ export const PULSECHAIN = {
   id: 369,
   name: 'PulseChain',
   nativeCurrency: { name: 'Pulse', symbol: 'PLS', decimals: 18 },
-  rpcUrl: 'https://rpc.pulsechain.com',
+  rpcUrl: 'https://pulsechain.publicnode.com',
   rpcUrls: [
-    'https://rpc.pulsechain.com',
     'https://pulsechain.publicnode.com',
+    'https://rpc.pulsechain.com',
   ],
   explorer: 'https://otter.pulsechain.com',
   scanApi: 'https://api.scan.pulsechain.com/api',
 };
 
 export const TOKEN_LOGOS = {
-  PLS: 'pulsechain-logo.webp',
+  // Prefer sharp PNG (128px) over tiny webp — webp looked blurry in small dropdowns
+  PLS: 'pulsechain-logo.png',
   VDO: 'voodoo-token.png',
   MAGIC: 'magic-token.png',
   POISON: 'poison-token.png',
-  WPLS: 'pulsechain-logo.webp',
+  WPLS: 'pulsechain-logo.png',
 };
 
 export const DEFAULT_TOKENS = [
@@ -32,7 +33,8 @@ export const DEFAULT_TOKENS = [
     address: '0xb8c8761fed2aad5c0a75561bc604531a42c452e6',
     symbol: 'POISON',
     name: 'POISON',
-    decimals: 18,
+    // On-chain ERC20 decimals are 9 (not 18) — wrong value breaks swap quotes & balances
+    decimals: 9,
     logo: TOKEN_LOGOS.POISON,
     coingeckoId: null,
   },
@@ -45,7 +47,7 @@ export const DEFAULT_TOKENS = [
     coingeckoId: null,
   },
   {
-    address: '0xA1077a294dE1B0839fBafdd384249e0cE9860AA',
+    address: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27',
     symbol: 'WPLS',
     name: 'Wrapped Pulse',
     decimals: 18,

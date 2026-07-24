@@ -1,31 +1,52 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useWallet } from '../../context/WalletContext';
+import { useI18n } from '../../context/I18nContext.jsx';
+
+const QR_SIZE = 148;
 
 export default function Receive() {
+  const { t } = useI18n();
   const { address } = useWallet();
   const [qr, setQr] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
 
   useEffect(() => {
     if (!address) return;
-    QRCode.toDataURL(address, { width: 180, margin: 1 }).then(setQr);
+    QRCode.toDataURL(address, { width: QR_SIZE, margin: 1 }).then(setQr).catch(() => {});
   }, [address]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopyError(t('error_copy_clipboard'));
+    }
   };
 
   return (
-    <div className="card" style={{ textAlign: 'center' }}>
-      <div className="label">Your PulseChain address</div>
-      <p style={{ wordBreak: 'break-all', fontSize: 12 }}>{address}</p>
-      {qr && <img className="qr" src={qr} alt="QR code" width={180} height={180} />}
-      <button type="button" className="btn btn-primary" onClick={copy}>
-        {copied ? 'Copied!' : 'Copy address'}
-      </button>
+    <div className="receive-page">
+      <div className="card receive-card">
+        <div className="label receive-label">{t('receive_address')}</div>
+        <p className="receive-address" title={address}>{address}</p>
+        {qr && (
+          <img
+            className="qr receive-qr"
+            src={qr}
+            alt={t('qr_alt')}
+            width={QR_SIZE}
+            height={QR_SIZE}
+          />
+        )}
+        <button type="button" className="btn btn-primary receive-copy-btn" onClick={copy}>
+          {copied ? t('copied') : t('copy_address')}
+        </button>
+        {copyError && <p className="error receive-error">{copyError}</p>}
+      </div>
     </div>
   );
 }

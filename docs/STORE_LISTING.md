@@ -8,7 +8,7 @@ Use this document when submitting version 1.0.6+ to the Chrome Web Store.
 
 ## Short description
 
-Non-custodial PulseChain wallet with VDO staking, activity history, and MetaMask-compatible dApp support.
+Non-custodial PulseChain wallet with VDO staking, activity history, and MetaMask-compatible dApp support. Not affiliated with MetaMask.
 
 ## Detailed description (suggested)
 
@@ -31,6 +31,8 @@ Your keys never leave your device. We do not collect personal data or run backen
 |------------|---------------|
 | `storage` | Store encrypted wallet vault, settings, and per-site DApp connection permissions locally. |
 | `tabs` | Deliver DApp RPC responses and account updates to the correct browser tab. |
+| `notifications` | Alert users to incoming PLS or token transfers while the extension is closed. |
+| `alarms` | Poll for incoming transactions every few minutes when notifications are enabled. |
 | `host_permissions` (RPC & APIs) | Read balances, broadcast transactions, fetch prices and activity history from PulseChain and public price APIs. |
 | Content script on **all URLs** | Inject `window.ethereum` so users can connect to PulseChain dApps on any HTTPS site. The script does not read page content or inject ads. Required for Web3 wallet functionality. |
 

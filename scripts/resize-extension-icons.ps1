@@ -25,15 +25,22 @@ function Resize-Png {
   Write-Output "$DestPath ${Width}x$Height"
 }
 
-$source = 'C:\Users\ReMarkt\Desktop\Untitled design (84).png'
+$extensionIcon = 'C:\Users\ReMarkt\Desktop\voodoo-token-web-extension-icon.png'
+$appLogo = 'C:\Users\ReMarkt\Desktop\Voodoo-Token-Logo.png'
 $public = 'C:\Users\ReMarkt\voodoo-pulse-extension\public'
 $images = 'C:\Users\ReMarkt\voodoo-pulse-extension\src\images'
 
-# Toolbar, favicon, and Chrome Web Store icons only — do not overwrite in-app header logo (voodoo-wallet.png).
-Resize-Png -SourcePath $source -DestPath (Join-Path $public 'icon16.png') -Width 16
-Resize-Png -SourcePath $source -DestPath (Join-Path $public 'icon48.png') -Width 48
-Resize-Png -SourcePath $source -DestPath (Join-Path $public 'icon128.png') -Width 128
+# Chrome toolbar / Web Store icons
+Resize-Png -SourcePath $extensionIcon -DestPath (Join-Path $public 'icon16.png') -Width 16
+Resize-Png -SourcePath $extensionIcon -DestPath (Join-Path $public 'icon48.png') -Width 48
+Resize-Png -SourcePath $extensionIcon -DestPath (Join-Path $public 'icon128.png') -Width 128
+Resize-Png -SourcePath $extensionIcon -DestPath (Join-Path $public 'voodoo-extension-icon.png') -Width 128
+
+# In-app branding (header + recovery phrase) — full resolution, do not resize
+Copy-Item $appLogo (Join-Path $public 'voodoo-wallet.png') -Force
 
 Copy-Item (Join-Path $public 'icon16.png') (Join-Path $images 'icon16.png') -Force
 Copy-Item (Join-Path $public 'icon48.png') (Join-Path $images 'icon48.png') -Force
 Copy-Item (Join-Path $public 'icon128.png') (Join-Path $images 'icon128.png') -Force
+Copy-Item (Join-Path $public 'voodoo-extension-icon.png') (Join-Path $images 'voodoo-extension-icon.png') -Force
+Copy-Item (Join-Path $public 'voodoo-wallet.png') (Join-Path $images 'voodoo-wallet.png') -Force

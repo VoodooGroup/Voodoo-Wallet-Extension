@@ -6,15 +6,19 @@
   "description": "Voodoo Wallet — PulseChain wallet with VDO staking",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "https://rpc.pulsechain.com/*",
-    "https://scan.pulsechain.com/*",
+    "https://pulsechain.publicnode.com/*",
     "https://api.scan.pulsechain.com/*",
     "https://otter.pulsechain.com/*",
     "https://api.coingecko.com/*",
     "https://api.dexscreener.com/*",
+    "https://api.geckoterminal.com/*",
+    "https://api.livecoinwatch.com/*",
     "https://open.er-api.com/*"
   ],
   "options_ui": {
@@ -42,7 +46,7 @@
   "content_scripts": [
     {
       "js": [
-        "dist/assets/bridge.js-DCzDkPAY.js"
+        "content-bridge-root.js"
       ],
       "matches": [
         "<all_urls>"
@@ -58,8 +62,9 @@
       "resources": [
         "dist/assets/*",
         "dist/public/*",
-        "dist/assets/provider.js-CFu1wAgK.js",
-        "dist/assets/bridge.js-DCzDkPAY.js"
+        "dist/assets/provider.js-D6HM1G-q.js",
+        "dist/assets/bridge.js-Cz9IDdYz.js",
+        "content-bridge-root.js"
       ],
       "use_dynamic_url": false
     },
@@ -69,7 +74,9 @@
         "https://*/*"
       ],
       "resources": [
-        "dist/assets/provider.js-CFu1wAgK.js"
+        "dist/assets/provider.js-D6HM1G-q.js",
+        "dist/assets/*",
+        "content-bridge-root.js"
       ],
       "use_dynamic_url": false
     }

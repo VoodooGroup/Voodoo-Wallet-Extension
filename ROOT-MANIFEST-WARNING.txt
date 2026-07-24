@@ -1,0 +1,8 @@
+The manifest.json in THIS folder (project root) uses "dist/..." paths.
+It is ONLY for developers loading the full repo from the parent folder.
+
+For GitHub / end users, upload and load ONE of these instead:
+  - dist/           (folder — correct manifest inside)
+  - github-dist/    (flat copy — run: npm run package:github)
+
+Never upload the project-root manifest.json to a GitHub dist-only release.

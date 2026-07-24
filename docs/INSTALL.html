@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Install Voodoo Wallet — Chrome Extension</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card: #1a1d27;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --accent: #d73847;
+      --ok: #34a853;
+      --warn: #f9ab00;
+      --border: #2d3142;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Segoe UI, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 1.9rem; margin-bottom: 0.25rem; }
+    .sub { color: var(--muted); margin-bottom: 2rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 18px;
+    }
+    h2 { font-size: 1.15rem; margin: 0 0 12px; color: #fff; }
+    ol, ul { padding-left: 1.25rem; }
+    li { margin: 8px 0; }
+    code, .path {
+      background: #11141c;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-family: Consolas, monospace;
+      font-size: 0.92rem;
+    }
+    .tree {
+      background: #11141c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: Consolas, monospace;
+      font-size: 0.88rem;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .bad { color: #ff6b6b; }
+    .good { color: var(--ok); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; }
+    th { background: #11141c; }
+    .btn {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 10px 16px;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .note {
+      border-left: 4px solid var(--warn);
+      padding: 10px 14px;
+      background: rgba(249, 171, 0, 0.08);
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+    .lang { color: var(--muted); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Install Voodoo Wallet</h1>
+    <p class="sub">Chrome extension for PulseChain — download from GitHub and load manually.</p>
+
+    <div class="card">
+      <h2>1. Download from GitHub</h2>
+      <ol>
+        <li>Go to the <a href="https://github.com/Voodoo-Token/voodoo-pulse-extension" style="color:#8ab4f8">Voodoo Wallet GitHub repository</a></li>
+        <li>Click the green <strong>Code</strong> button</li>
+        <li>Click <strong>Download ZIP</strong></li>
+        <li>Save the file to your computer</li>
+      </ol>
+      <a class="btn" href="https://github.com/Voodoo-Token/voodoo-pulse-extension/archive/refs/heads/main.zip">Download ZIP</a>
+    </div>
+
+    <div class="card">
+      <h2>2. Unzip the file</h2>
+      <ol>
+        <li>Right-click the downloaded <code>.zip</code> file</li>
+        <li>Choose <strong>Extract All…</strong></li>
+        <li>Open the extracted folder in File Explorer</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>3. Select the correct folder</h2>
+      <p>GitHub adds an extra wrapper folder. Open the <strong>inner</strong> project folder, then the <strong>dist</strong> folder.</p>
+      <div class="tree"><span class="bad">📁 voodoo-pulse-extension-main          ← WRONG (no manifest)</span>
+   └── <span class="good">📁 voodoo-pulse-extension-main</span>
+          ├── <span class="good">📁 dist                     ← SELECT THIS in Chrome</span>
+          ├── 📁 src
+          └── manifest.json</div>
+      <div class="note">
+        <strong>Rule:</strong> the folder you load in Chrome must contain <code>manifest.json</code>.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>4. Load in Chrome</h2>
+      <ol>
+        <li>Open <code>chrome://extensions</code></li>
+        <li>Turn <strong>Developer mode</strong> ON</li>
+        <li>Click <strong>Load unpacked</strong></li>
+        <li>Select the <strong>dist</strong> folder from step 3</li>
+        <li>Click <strong>Select Folder</strong></li>
+      </ol>
+      <p>Pin Voodoo Wallet from the extensions puzzle icon in the toolbar.</p>
+    </div>
+
+    <div class="card">
+      <h2>Troubleshooting</h2>
+      <table>
+        <thead>
+          <tr><th>Error</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Manifest missing / ontbreekt</td>
+            <td>You selected the outer folder. Use the <strong>dist</strong> subfolder.</td>
+          </tr>
+          <tr>
+            <td>MIME type main.jsx</td>
+            <td>You loaded source code. Use the <strong>dist</strong> folder.</td>
+          </tr>
+          <tr>
+            <td>Not from Chrome Web Store</td>
+            <td>Normal for manual installs. Click Keep / Behouden if prompted.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr />
+    <p class="lang"><strong>Installatie (Nederlands):</strong> Download ZIP → uitpakken → open de binnenste map → in Chrome <em>Uitgepakte extensie laden</em> → selecteer de map <strong>dist</strong>. Selecteer niet de buitenste map (dan krijg je “Manifest ontbreekt”).</p>
+    <p class="lang">Privacy policy: <a href="https://voodootoken.com/privacy-policy-web-extension.html" style="color:#8ab4f8">voodootoken.com</a> · Contact: info@voodootoken.com</p>
+  </div>
+</body>
+</html>

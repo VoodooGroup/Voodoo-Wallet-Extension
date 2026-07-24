@@ -1,24 +1,83 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '../../context/WalletContext';
+import { useI18n } from '../../context/I18nContext.jsx';
+import { TOKEN_LOGOS } from '../../config/pulsechain';
 import { estimateGasSend, sendNative, sendToken } from '../../lib/chain';
 import { formatEther } from 'ethers';
-import { formatTxError } from '../../lib/gas';
+import { parseSendBlocker } from '../../lib/send-validation.js';
+import { buildSendConfirmPreview } from '../../lib/tx-preview.js';
 import { normalizeAddress } from '../../lib/validate';
-import { shortenAddress } from '../../lib/wallet';
+import SendConfirmModal from '../../components/SendConfirmModal';
+import SwapErrorModal from '../../components/SwapErrorModal';
+import PopupSelect from '../../components/PopupSelect';
+import TokenIcon from '../../components/TokenIcon';
+import { notifyTransferSent } from '../../lib/notify-transfer';
+import { assetUrl } from '../../lib/assets';
+import { getTransfer2faEnabled } from '../../lib/storage';
+import { getSessionTotpSecret } from '../../lib/session';
+import { translateError } from '../../lib/i18n/translate-error.js';
+
+function sendBlockerFromError(error, t) {
+  if (error?.blocker) return error.blocker;
+  return parseSendBlocker(error, t);
+}
+
+/** Resolve token logo URL for PopupSelect (same approach as Swap). */
+function sendTokenIconSrc(tok) {
+  if (tok?.logoData) return tok.logoData;
+  if (tok?.logo) return assetUrl(tok.logo) || null;
+  const fallback = TOKEN_LOGOS[tok?.symbol];
+  if (fallback) return assetUrl(fallback) || null;
+  return null;
+}
 
 export default function Send() {
-  const { signer, tokens } = useWallet();
+  const { t } = useI18n();
+  const {
+    signer, tokens, activeAccount, getTotpEnabled, verifyTransfer2fa,
+  } = useWallet();
   const [asset, setAsset] = useState('PLS');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [gasInfo, setGasInfo] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [formAlert, setFormAlert] = useState(null); // { title, body } popup
   const [hash, setHash] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [confirmUi, setConfirmUi] = useState(null);
+  const [requireTotp, setRequireTotp] = useState(false);
+  const [needTotpPassword, setNeedTotpPassword] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpPassword, setTotpPassword] = useState('');
+  const [totpError, setTotpError] = useState('');
 
-  const selectedToken = tokens.find((t) => t.symbol === asset);
+  const selectedToken = tokens.find((tok) => tok.symbol === asset);
   const checksumTo = normalizeAddress(to);
+
+  const assetOptions = useMemo(() => {
+    const list = [{
+      value: 'PLS',
+      label: 'PLS',
+      icon: assetUrl(TOKEN_LOGOS.PLS) || null,
+    }];
+    const seen = new Set(['PLS']);
+    for (const tok of tokens || []) {
+      const symbol = tok.symbol || '';
+      if (!symbol || seen.has(symbol)) continue;
+      seen.add(symbol);
+      list.push({
+        value: symbol,
+        label: symbol,
+        icon: sendTokenIconSrc(tok),
+      });
+    }
+    return list;
+  }, [tokens]);
+
+  const selectedAssetMeta = asset === 'PLS'
+    ? { symbol: 'PLS', logo: TOKEN_LOGOS.PLS, logoData: undefined }
+    : selectedToken;
 
   useEffect(() => {
     if (!signer || !checksumTo || !amount || Number(amount) <= 0) {
@@ -48,28 +107,96 @@ export default function Send() {
     ? formatEther(BigInt(gasInfo.gasLimit) * BigInt(gasInfo.gasPrice))
     : null;
 
-  const openConfirm = () => {
-    setError('');
+  const closeConfirm = () => {
+    setConfirming(false);
+    setConfirmUi(null);
+    setTotpCode('');
+    setTotpPassword('');
+    setTotpError('');
+  };
+
+  const openConfirm = async () => {
+    setFormAlert(null);
+    setTotpCode('');
+    setTotpPassword('');
+    setTotpError('');
     if (!checksumTo) {
-      setError('Enter a valid recipient address (0x…)');
+      const empty = !String(to || '').trim();
+      setFormAlert({
+        reason: 'generic',
+        title: empty
+          ? t('error_missing_recipient_title')
+          : t('error_invalid_recipient_title'),
+        body: empty
+          ? t('error_missing_recipient_body')
+          : t('error_invalid_recipient_body'),
+      });
       return;
     }
     if (!amount || Number(amount) <= 0) {
-      setError('Enter a valid amount');
+      setFormAlert({
+        reason: 'generic',
+        title: t('error_invalid_amount_title'),
+        body: t('error_invalid_amount_body'),
+      });
       return;
     }
     if (asset !== 'PLS' && !selectedToken) {
-      setError('Select a valid token');
+      setFormAlert({
+        reason: 'generic',
+        title: t('error_invalid_token_title'),
+        body: t('error_invalid_token_body'),
+      });
       return;
     }
-    setConfirming(true);
+
+    setReviewBusy(true);
+    try {
+      const [transfer2faOn, totpOn, sessionSecret] = await Promise.all([
+        getTransfer2faEnabled(),
+        getTotpEnabled(),
+        getSessionTotpSecret(),
+      ]);
+      const needs2fa = Boolean(transfer2faOn && totpOn);
+      setRequireTotp(needs2fa);
+      setNeedTotpPassword(needs2fa && !sessionSecret);
+
+      const preview = await buildSendConfirmPreview({
+        signer,
+        to: checksumTo,
+        amount,
+        isNative: asset === 'PLS',
+        token: selectedToken,
+      });
+      setConfirmUi({ phase: 'ready', preview, blocker: null });
+      setConfirming(true);
+    } catch (e) {
+      setConfirmUi({
+        phase: 'blocked',
+        preview: null,
+        blocker: sendBlockerFromError(e, t),
+      });
+      setConfirming(true);
+    } finally {
+      setReviewBusy(false);
+    }
   };
 
   const submit = async () => {
     setBusy(true);
-    setError('');
     setHash('');
+    setTotpError('');
     try {
+      if (requireTotp) {
+        try {
+          await verifyTransfer2fa(totpCode, needTotpPassword ? totpPassword : '');
+        } catch (err) {
+          setTotpError(translateError(t, err.message) || t('error_totp_invalid'));
+          setBusy(false);
+          return;
+        }
+      }
+
       let txHash;
       if (asset === 'PLS') {
         txHash = await sendNative(signer, checksumTo, amount);
@@ -77,11 +204,22 @@ export default function Send() {
         txHash = await sendToken(signer, selectedToken.address, checksumTo, amount, selectedToken.decimals);
       }
       setHash(txHash);
+      notifyTransferSent({
+        amount,
+        symbol: asset,
+        to: checksumTo,
+        accountName: activeAccount?.name,
+        hash: txHash,
+      });
       setAmount('');
       setTo('');
-      setConfirming(false);
+      closeConfirm();
     } catch (e) {
-      setError(formatTxError(e));
+      setConfirmUi({
+        phase: 'blocked',
+        preview: null,
+        blocker: sendBlockerFromError(e, t),
+      });
     } finally {
       setBusy(false);
     }
@@ -89,69 +227,91 @@ export default function Send() {
 
   return (
     <>
-      <div className="card">
-        <div className="label">Asset</div>
-        <select value={asset} onChange={(e) => setAsset(e.target.value)}>
-          <option value="PLS">PLS</option>
-          {tokens.map((t) => (
-            <option key={t.address} value={t.symbol}>{t.symbol}</option>
-          ))}
-        </select>
+      <div className="card send-card">
+        <div className="label">{t('send_asset')}</div>
+        <div className="send-asset-select">
+          <TokenIcon
+            symbol={selectedAssetMeta?.symbol || asset}
+            logo={selectedAssetMeta?.logo}
+            logoData={selectedAssetMeta?.logoData}
+            className="token-icon-sm"
+          />
+          <PopupSelect
+            value={asset}
+            onChange={setAsset}
+            options={assetOptions}
+            ariaLabel={t('send_asset')}
+          />
+        </div>
 
-        <div className="label">Recipient</div>
+        <div className="label">{t('send_recipient')}</div>
         <input
           value={to}
-          onChange={(e) => setTo(e.target.value)}
-          placeholder="0x…"
+          onChange={(e) => {
+            setTo(e.target.value);
+            setFormAlert(null);
+          }}
+          placeholder={t('placeholder_address')}
           spellCheck={false}
         />
-        {to && !checksumTo && <p className="error">Invalid address</p>}
 
-        <div className="label">Amount</div>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
+        <div className="label">{t('send_amount')}</div>
+        <input
+          value={amount}
+          onChange={(e) => {
+            setAmount(e.target.value);
+            setFormAlert(null);
+          }}
+          placeholder={t('placeholder_amount')}
+        />
 
-        {estCost && <p className="muted">Est. gas: ~{Number(estCost).toFixed(6)} PLS</p>}
+        {estCost && <p className="muted">{t('est_gas', { cost: Number(estCost).toFixed(6) })}</p>}
 
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={openConfirm}>
-          Review send
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={busy || reviewBusy}
+          onClick={openConfirm}
+        >
+          {reviewBusy ? t('send_confirm_loading') : t('review_send')}
         </button>
-        {error && !confirming && <p className="error">{error}</p>}
-        {hash && <p className="success">Sent: {hash.slice(0, 14)}…</p>}
+        {hash && <p className="success">{t('sent_hash', { hash: hash.slice(0, 14) })}</p>}
       </div>
 
-      {confirming && (
-        <div className="modal-overlay" onClick={() => setConfirming(false)} role="presentation">
-          <div className="modal-card" onClick={(e) => e.stopPropagation()} role="dialog">
-            <div className="label">Confirm send</div>
-            <div className="confirm-rows">
-              <div className="confirm-row">
-                <span className="label">To</span>
-                <span className="value">{shortenAddress(checksumTo, 8)}</span>
-              </div>
-              <div className="confirm-row">
-                <span className="label">Amount</span>
-                <span className="value">{amount} {asset}</span>
-              </div>
-              {estCost && (
-                <div className="confirm-row">
-                  <span className="label">Est. gas</span>
-                  <span className="value">~{Number(estCost).toFixed(6)} PLS</span>
-                </div>
-              )}
-            </div>
-            <p className="muted" style={{ fontSize: 12 }}>Double-check the address. Transactions cannot be reversed.</p>
-            <div className="row" style={{ marginTop: 12, gap: 8 }}>
-              <button type="button" className="btn btn-secondary" style={{ width: 'auto' }} disabled={busy} onClick={() => setConfirming(false)}>
-                Cancel
-              </button>
-              <button type="button" className="btn btn-primary" style={{ width: 'auto', flex: 1 }} disabled={busy} onClick={submit}>
-                {busy ? 'Sending…' : 'Confirm & send'}
-              </button>
-            </div>
-            {error && <p className="error">{error}</p>}
-          </div>
-        </div>
-      )}
+      <SwapErrorModal
+        open={Boolean(formAlert)}
+        blocker={formAlert}
+        title={formAlert?.title}
+        onClose={() => setFormAlert(null)}
+      />
+
+      <SendConfirmModal
+        open={confirming}
+        phase={confirmUi?.phase}
+        preview={confirmUi?.preview}
+        blocker={confirmUi?.blocker}
+        fromAccountName={activeAccount?.name}
+        to={checksumTo}
+        amount={amount}
+        asset={asset}
+        selectedToken={selectedToken}
+        busy={busy}
+        requireTotp={requireTotp}
+        needTotpPassword={needTotpPassword}
+        totpCode={totpCode}
+        totpPassword={totpPassword}
+        totpError={totpError}
+        onTotpCodeChange={(v) => {
+          setTotpCode(v);
+          setTotpError('');
+        }}
+        onTotpPasswordChange={(v) => {
+          setTotpPassword(v);
+          setTotpError('');
+        }}
+        onCancel={closeConfirm}
+        onConfirm={submit}
+      />
     </>
   );
 }

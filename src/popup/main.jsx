@@ -10,8 +10,4 @@ applyTheme(DEFAULT_THEME);
 document.documentElement.style.setProperty('--wallpaper-image', `url("${wallpaperUrl()}")`);
 applyFullscreenMode();
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
